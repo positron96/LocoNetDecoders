@@ -1,0 +1,6 @@
+This repository contains code for several DIY accessory decoders for LocoNet bus. 
+
+* LND-8CDU - A decoder with 8 capacitor-discharge outputs.
+* LND-16L8I - A decoder with 16 LED (constant-current) outputs and 8 digital inputs (and 2 analog)
+
+The projects are for Arduino Pro Mini and PlatformIO, but will work with any decent Arduino and can be built with Arduino IDE.
