@@ -1,5 +1,8 @@
 #include <LocoNet.h>
 #include <SPI.h>
+#include <MsTimer2.h>
+
+#include "pdm.h"
 
 constexpr int PIN_OE = 6;
 constexpr int PIN_LE = 7;
@@ -25,7 +28,9 @@ constexpr uint8_t ID_SWVER = 1;
 
 uint16_t startAddr;
 bool fade;
-uint16_t output=0;
+using pdm = PDM<ADDR_COUNT>;
+
+uint8_t maxVals[ADDR_COUNT] = { 0 };
 
 bool configMode = false;
 uint16_t configVar = 0;
@@ -41,6 +46,8 @@ constexpr int LED_INTL_CONFIG2 = 150;
 void ledFire(uint32_t, uint8_t);
 void ledStop();
 
+void timerTick();
+
 void setup() {
     Serial.begin(115200);
     Serial.println(F("LND-16L8I - LocoNet accessory decoder with 16 LEDs and 8 inputs"));
@@ -54,8 +61,10 @@ void setup() {
     digitalWrite(PIN_OE, LOW);
     pinMode(PIN_LE, OUTPUT);
     
+    pdm::init();
+    for(int ch=0; ch<ADDR_COUNT; ch++) maxVals[ch]=255;
+    maxVals[0] = 30;
     SPI.begin();
-    sendOutput();
     
     LocoNet.init(PIN_TX);  
 
@@ -79,6 +88,9 @@ void setup() {
     Serial.println(startAddr);
     Serial.print(F("Fade is "));
     Serial.println(fade?"On":"Off");
+
+    MsTimer2::set(1, timerTick); // 1000 fps
+    MsTimer2::start();
 }
 
 int hex2int(char ch) {
@@ -88,46 +100,37 @@ int hex2int(char ch) {
     return -1;
 }
 
-// https://matthewearl.github.io/2015/03/05/efficient-pwm/
-constexpr uint32_t TRANS_TIME = 100; // ms
-constexpr uint8_t BITS = 2;
-constexpr uint8_t RES = 1<<BITS; // 4 pwm values
-constexpr uint8_t P = RES-1;
 
-void sendOutput() {
+constexpr uint32_t TRANS_TIME = 100; // transition time, ms
+constexpr uint8_t RES = 5; // "frames" for full transition
+
+
+void timerTick() {
+    pdm::tick();
     digitalWrite(PIN_LE, LOW);
-    SPI.transfer16( output ); 
+    SPI.transfer16( pdm::values() & 0xFFFF ); 
     digitalWrite(PIN_LE, HIGH);
 }
+
 void changeOutput(uint8_t ch, uint8_t val) {
-    uint8_t pwm;
-    uint8_t h2;
-    if(bitRead(output, ch)==val)  return;
+    uint8_t to = val>0 ? maxVals[ch] : 0;
+    uint8_t from = pdm::get(ch);
 
     Serial.print("Setting channel ");
     Serial.print(ch);
     Serial.print(" to ");
-    Serial.println(val);
+    Serial.println(to);
+
+    if( to == from ) return;
 
     if(fade) {
         for(int i=0; i<RES; i++) {
-            pwm = val==1 ? i : (P-i);
-    
-            long tout = millis() + (TRANS_TIME/RES);
-            while(millis()<tout) {
-                if(h2<pwm) {
-                    bitSet(output, ch);
-                    h2 += P-pwm;
-                } else {
-                    bitClear(output, ch);
-                    h2 -= pwm;
-                }
-                sendOutput();
-            }
+            uint8_t pwm = from + (to-from)*i/RES;
+            pdm::set(ch, pwm);
+            delay(TRANS_TIME/RES);
         }
     }
-    bitWrite(output, ch, val);
-    sendOutput();
+    pdm::set(ch, to);
 }
 
 void ledFire(uint32_t ms, uint8_t val=1) {
@@ -222,7 +225,7 @@ void loop() {
     if (Serial.available()>0) {
         uint8_t ch = hex2int(Serial.read());
         if(ch>=0 && ch<16) {
-            changeOutput(ch, 1-bitRead(output, ch));    
+            changeOutput(ch, pdm::get(ch)>0?0:1 ); 
         }
     }
 
@@ -308,7 +311,7 @@ void reportChannelState(uint8_t ch) {
     txMsg.srp.command = OPC_SW_REP;
     txMsg.srp.sn1 = addr & 0x7F;
     txMsg.srp.sn2 = ((addr >> 7) & 0x0F)  
-        |  (bitRead(output,ch) ? OPC_SW_REP_THROWN: OPC_SW_REP_CLOSED)  ;
+        |  (pdm::get(ch)>0 ? OPC_SW_REP_THROWN: OPC_SW_REP_CLOSED)  ;
     LocoNet.send(&txMsg);
 }
 
