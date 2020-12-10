@@ -102,7 +102,7 @@ int hex2int(char ch) {
 
 
 constexpr uint32_t TRANS_TIME = 100; // transition time, ms
-constexpr uint8_t RES = 5; // "frames" for full transition
+constexpr uint8_t RES = TRANS_TIME/25; // "frames" for full transition
 
 
 void timerTick() {
