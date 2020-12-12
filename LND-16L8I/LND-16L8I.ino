@@ -128,6 +128,7 @@ void changeOutput(uint8_t ch, uint8_t val) {
     }
     bitWrite(output, ch, val);
     sendOutput();
+    reportChannelState(ch);
 }
 
 void ledFire(uint32_t ms, uint8_t val=1) {
@@ -277,7 +278,6 @@ void notifySwitchRequest( uint16_t addr, uint8_t out, uint8_t dir ) {
             uint8_t ch = (addr-startAddr); // requested pin
             uint8_t val = thrown?1:0;
             changeOutput(ch, val);    
-            reportChannelState(ch);
         }
         return;
     }
