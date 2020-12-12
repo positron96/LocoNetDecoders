@@ -113,8 +113,8 @@ void changeOutput(uint8_t ch, uint8_t val) {
         for(int i=0; i<RES; i++) {
             pwm = val==1 ? i : (P-i);
     
-            long tout = millis() + (TRANS_TIME/RES);
-            while(millis()<tout) {
+            unsigned long tstart = millis();
+            while(millis()-tstart < TRANS_TIME/RES ) {
                 if(h2<pwm) {
                     bitSet(output, ch);
                     h2 += P-pwm;
@@ -264,17 +264,20 @@ void loop() {
 void notifySwitchRequest( uint16_t addr, uint8_t out, uint8_t dir ) {
     bool on = out!=0;
     bool thrown = dir==0;
-    /*Serial.print("Switch Request: ");
+    
+    Serial.print("Switch Request: ");
     Serial.print(addr, DEC);
     Serial.print(':');
     Serial.print(dir ? "Closed" : "Thrown");
     Serial.print(" - ");
-    Serial.println(out ? "On" : "Off");*/
+    Serial.println(out ? "On" : "Off");
 
     if(!on) return;
 
     if(!configMode) {
         if(addr >= startAddr && addr<startAddr+ADDR_COUNT) {
+            ledFire(100);
+
             uint8_t ch = (addr-startAddr); // requested pin
             uint8_t val = thrown?1:0;
             changeOutput(ch, val);    
