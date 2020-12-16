@@ -18,7 +18,7 @@ constexpr uint16_t VCC_MAX_DROP = 500; // mV
 // 9V at VOUT, 3V at ADC (3/5*1024=614 ticks), 
 // 9000 / (9000/3/5000*1024) = 5000*3/1024
 constexpr uint16_t ADC2MV = 15;
-constexpr uint16_t MIN_VCC = 1000;
+constexpr uint16_t MIN_VCC = 7000; // arduino works at 7-12V, do not allow VCC to fall lower than this.
 volatile uint16_t vccLevel=0;
 volatile uint16_t vccLevelAvg=0;
 volatile uint16_t capLevel=0;
@@ -86,7 +86,7 @@ void setup() {
     }
 
     startAddr = sv.readSVNodeId(); 
-    pulseDurationMs = 25;//sv.readSVStorage(SV_ADDR_PULSE_DURATION);
+    pulseDurationMs = 50;//sv.readSVStorage(SV_ADDR_PULSE_DURATION);
     pulseCount = sv.readSVStorage(SV_ADDR_PULSE_COUNT);  
     
     Serial.println(F("Init done"));
@@ -102,7 +102,9 @@ void setup() {
     // ADC
     ADMUX = bit(REFS0) | 0;//(adcCh & 0xF);  
     // Auto trigger + Int En + div 128
-    ADCSRA =bit(ADATE) | bit(ADIE) | 0x7;
+    //ADCSRA = bit(ADATE) | bit(ADIE) | 0x7;
+    // Int En + div 128
+    ADCSRA = bit(ADIE) | 0x7;
     // Free running
     ADCSRB = 0;
     // Enable + Start conversion
@@ -263,8 +265,7 @@ ISR(ADC_vect) {
     mV |= ADCH<<8;
     mV *= ADC2MV;
     
-    // Somewhy we get ADC0 (cap) when curCh==1 and ADC1 (VCC) when curCh==0.
-    if(curCh==0) { // VCC
+    if(curCh==1) { // VCC
         vccLevel = mV;
         togglePower( mV > vccLevelAvg - (int16_t)VCC_MAX_DROP);
     } else {  // CAP
@@ -278,6 +279,7 @@ ISR(ADC_vect) {
     
     ADMUX = (ADMUX & B11110000) | curCh;
     //ADMUX = ADMUX ~ 0x3; // flip bits 0 and 1
+    ADCSRA |= bit(ADSC) ;
 }
 
 void updateVoltages() {
@@ -291,8 +293,8 @@ void updateVoltages() {
     }
 
     static uint32_t lastPrint = millis();
-    if(millis()-lastPrint>25) {
-        //Serial.println(String(vccLevel)+", "+vccLevelAvg+", "+capLevel+", "+(digitalRead(PIN_CHARGE)*5000));
+    if(millis()-lastPrint>25 && ((uint32_t)capLevel*100 < (uint32_t)vccLevelAvg*99) ) {
+        Serial.println(String(vccLevel)+", "+vccLevelAvg+", "+capLevel+", "+(digitalRead(PIN_CHARGE)*5000));
         lastPrint=millis();
     }
 }
@@ -307,13 +309,13 @@ inline void waitCharge() {
 }
 
 inline void pulsePin(uint8_t pin) {
-    Serial.println(String("pulsePin: ")+vccLevel+", "+vccLevelAvg+", "+capLevel;
+    //Serial.println(String("pulsePin: ")+vccLevel+", "+vccLevelAvg+", "+capLevel);
     digitalWrite(PINS_O[pin], HIGH);
     ledFire(100);
     long startTime = millis();
     while(millis()-startTime < pulseDurationMs && vccLevel>MIN_VCC ) {}
     digitalWrite(PINS_O[pin], LOW);
-    //Serial.println( String("pulsePin(); duration(ms): ")+(millis()-startTime) );
+    Serial.println( String("pulsePin(); duration(ms): ")+(millis()-startTime) );
 }
 
 inline void pulsePinFull(uint8_t ipin) {
