@@ -9,7 +9,10 @@ constexpr int PIN_BT = 2;
 constexpr int PIN_TX = 9;
 constexpr int PIN_RX = 8;
 
-constexpr int ADDR_COUNT = 16;
+constexpr int ADDR_OUT_COUNT = 16;
+constexpr int ADDR_IN_COUNT = 8;
+
+constexpr int PIN_IN[ADDR_IN_COUNT] = {A0, A1, A2, A3, A5, A5, 4, 5};
 
 LocoNetSystemVariableClass sv;
 
@@ -23,9 +26,11 @@ constexpr uint8_t ID_DEVLPR = 4;
 constexpr uint8_t ID_PRODUCT = 2;
 constexpr uint8_t ID_SWVER = 1;
 
-uint16_t startAddr;
+uint16_t startOutAddr;
 bool fade;
 uint16_t output=0;
+
+uint16_t startInAddr;
 
 bool configMode = false;
 uint16_t configVar = 0;
@@ -53,6 +58,8 @@ void setup() {
     pinMode(PIN_OE, OUTPUT);
     digitalWrite(PIN_OE, LOW);
     pinMode(PIN_LE, OUTPUT);
+
+    for(int i=0; i<ADDR_IN_COUNT; i++) pinMode(PIN_IN[i], INPUT);
     
     SPI.begin();
     sendOutput();
@@ -71,12 +78,12 @@ void setup() {
         sv.writeSVNodeId(DEFAULT_ADDR);
     }
 
-    startAddr = sv.readSVNodeId(); 
+    startOutAddr = sv.readSVNodeId(); 
     fade = sv.readSVStorage(SV_ADDR_FADING) != 0;
     
     Serial.println(F("Init done"));
     Serial.print(F("Address is "));
-    Serial.println(startAddr);
+    Serial.println(startOutAddr);
     Serial.print(F("Fade is "));
     Serial.println(fade?"On":"Off");
 }
@@ -174,6 +181,29 @@ void checkButton() {
     lastBt = bt;
 }
 
+
+void checkInputs() {
+    static uint8_t lastIns[ADDR_IN_COUNT] = {0};
+    static uint32_t primeTime[ADDR_IN_COUNT] = {0};
+    for(int i=0; i<ADDR_IN_COUNT; i++) {
+        uint8_t in = 1 - digitalRead(PIN_IN[i]); // it's inverted
+        if(lastIns[i] != in && primeTime[i]==0) {
+            primeTime[i] = millis();
+            lastIns[i] = in;
+        }
+        if(primeTime[i] != 0 && millis()-primeTime[i]>10) {
+            if(lastIns[i] == in) {
+                // in = jitter-free value
+                Serial.print("Sensor changed to ");
+                Serial.println(in);
+                LocoNet.reportSensor(startInAddr+i, in);
+            }
+            primeTime[i] = 0;
+        }
+    }
+}
+
+
 void loop() {
     static bool deferredProcessingNeeded = false;
 
@@ -193,6 +223,8 @@ void loop() {
         deferredProcessingNeeded = (sv.doDeferredProcessing() != SV_OK);
 
     checkButton();
+
+    checkInputs();
 
     if(ledNextUpdate!=0 && millis()>ledNextUpdate) {
         ledVal = 1-ledVal;
@@ -275,10 +307,10 @@ void notifySwitchRequest( uint16_t addr, uint8_t out, uint8_t dir ) {
     if(!on) return;
 
     if(!configMode) {
-        if(addr >= startAddr && addr<startAddr+ADDR_COUNT) {
+        if(addr >= startOutAddr && addr<startOutAddr+ADDR_OUT_COUNT) {
             ledFire(100);
 
-            uint8_t ch = (addr-startAddr); // requested pin
+            uint8_t ch = (addr-startOutAddr); // requested pin
             uint8_t val = thrown?1:0;
             changeOutput(ch, val);    
         }
@@ -292,10 +324,10 @@ void notifySwitchRequest( uint16_t addr, uint8_t out, uint8_t dir ) {
             Serial.print("Var=");
             Serial.println(configVar);
         } else {
-            startAddr = addr;
-            //sv.writeSvNodeId(startAddr);
+            startOutAddr = addr;
+            //sv.writeSvNodeId(startOut);
             Serial.print("Changed start address to ");
-            Serial.println(startAddr);
+            Serial.println(startOutAddr);
             configVar = 0;
         }
         ledFire(2000);
@@ -305,7 +337,7 @@ void notifySwitchRequest( uint16_t addr, uint8_t out, uint8_t dir ) {
 }
 
 void reportChannelState(uint8_t ch) {
-    uint16_t addr = startAddr+ch;
+    uint16_t addr = startOutAddr+ch;
     addr -= 1;
     lnMsg txMsg;
     txMsg.srp.command = OPC_SW_REP;
