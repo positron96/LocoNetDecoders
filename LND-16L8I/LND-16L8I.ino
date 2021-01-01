@@ -12,7 +12,8 @@ constexpr int PIN_RX = 8;
 constexpr int ADDR_OUT_COUNT = 16;
 constexpr int ADDR_IN_COUNT = 8;
 
-constexpr int PIN_IN[ADDR_IN_COUNT] = {A0, A1, A2, A3, A5, A5, 4, 5};
+constexpr bool INPUT_PULLUP_EN = false;
+constexpr int PIN_IN[ADDR_IN_COUNT] = {A0, A1, A2, A3, A5, A4, 5, 4};
 
 LocoNetSystemVariableClass sv;
 
@@ -59,7 +60,9 @@ void setup() {
     digitalWrite(PIN_OE, LOW);
     pinMode(PIN_LE, OUTPUT);
 
-    for(int i=0; i<ADDR_IN_COUNT; i++) pinMode(PIN_IN[i], INPUT);
+    for(int i=0; i<ADDR_IN_COUNT; i++) {
+        pinMode(PIN_IN[i], INPUT_PULLUP_EN ? INPUT_PULLUP : INPUT);
+    }
     
     SPI.begin();
     sendOutput();
@@ -79,13 +82,17 @@ void setup() {
     }
 
     startOutAddr = sv.readSVNodeId(); 
+    startInAddr = startOutAddr;
     fade = sv.readSVStorage(SV_ADDR_FADING) != 0;
     
-    Serial.println(F("Init done"));
-    Serial.print(F("Address is "));
+    Serial.print(F("Output start address is "));
     Serial.println(startOutAddr);
+    Serial.print(F("Input start address is "));
+    Serial.println(startInAddr);
     Serial.print(F("Fade is "));
     Serial.println(fade?"On":"Off");
+
+    Serial.println(F("Init done"));
 }
 
 int hex2int(char ch) {
@@ -111,9 +118,9 @@ void changeOutput(uint8_t ch, uint8_t val) {
     uint8_t h2;
     if(bitRead(output, ch)==val)  return;
 
-    Serial.print("Setting channel ");
+    Serial.print(F("Setting channel "));
     Serial.print(ch);
-    Serial.print(" to ");
+    Serial.print(F(" to "));
     Serial.println(val);
 
     if(fade) {
@@ -186,18 +193,27 @@ void checkInputs() {
     static uint8_t lastIns[ADDR_IN_COUNT] = {0};
     static uint32_t primeTime[ADDR_IN_COUNT] = {0};
     for(int i=0; i<ADDR_IN_COUNT; i++) {
-        uint8_t in = 1 - digitalRead(PIN_IN[i]); // it's inverted
+        uint8_t in = digitalRead(PIN_IN[i]);
+        if(INPUT_PULLUP_EN) { 
+            in = 1-in; // it's inverted
+        }
+
         if(lastIns[i] != in && primeTime[i]==0) {
             primeTime[i] = millis();
             lastIns[i] = in;
         }
-        if(primeTime[i] != 0 && millis()-primeTime[i]>10) {
+        if( (primeTime[i] != 0) && (millis()-primeTime[i]>=10) ) {
             if(lastIns[i] == in) {
                 // in = jitter-free value
-                Serial.print("Sensor changed to ");
+                uint16_t inAddr = startInAddr+i;
+                Serial.print(F("Input pin "));
+                Serial.print(inAddr);
+                Serial.print(F(" changed to "));
                 Serial.println(in);
-                LocoNet.reportSensor(startInAddr+i, in);
-            }
+                ledFire(100);
+                LocoNet.reportSensor(inAddr, in);
+            } 
+            lastIns[i] = in;
             primeTime[i] = 0;
         }
     }
