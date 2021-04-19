@@ -1,8 +1,9 @@
 #include <LocoNet.h>
-#include <SPI.h>
+
+#include <Adafruit_PWMServoDriver.h>
 
 constexpr int PIN_OE = 6;
-constexpr int PIN_LE = 7;
+
 constexpr int PIN_LED = 10;
 constexpr int PIN_BT = 2;
 
@@ -14,6 +15,8 @@ constexpr int ADDR_IN_COUNT = 8;
 
 constexpr bool INPUT_PULLUP_EN = false;
 constexpr int PIN_IN[ADDR_IN_COUNT] = {A0, A1, A2, A3, A5, A4, 5, 4};
+
+Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver(0x40);
 
 LocoNetSystemVariableClass sv;
 
@@ -58,13 +61,13 @@ void setup() {
     
     pinMode(PIN_OE, OUTPUT);
     digitalWrite(PIN_OE, LOW);
-    pinMode(PIN_LE, OUTPUT);
 
     for(int i=0; i<ADDR_IN_COUNT; i++) {
         pinMode(PIN_IN[i], INPUT_PULLUP_EN ? INPUT_PULLUP : INPUT);
     }
     
-    SPI.begin();
+    pwm.begin();
+    pwm.setPWMFreq(1600);
     sendOutput();
     
     LocoNet.init(PIN_TX);  
@@ -109,9 +112,8 @@ constexpr uint8_t RES = 1<<BITS; // 4 pwm values
 constexpr uint8_t P = RES-1;
 
 void sendOutput() {
-    digitalWrite(PIN_LE, LOW);
-    SPI.transfer16( output ); 
-    digitalWrite(PIN_LE, HIGH);
+    
+    pwm.setPWM(pwmnum, 0, (i + (4096/16)*pwmnum) % 4096 );
 }
 void changeOutput(uint8_t ch, uint8_t val) {
     uint8_t pwm;
