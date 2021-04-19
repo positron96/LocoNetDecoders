@@ -31,8 +31,10 @@ constexpr uint8_t ID_PRODUCT = 2;
 constexpr uint8_t ID_SWVER = 1;
 
 uint16_t startOutAddr;
+uint16_t output;
+uint16_t maxOutputVals[ADDR_OUT_COUNT];
+
 bool fade;
-uint16_t output=0;
 
 uint16_t startInAddr;
 
@@ -58,9 +60,9 @@ void setup() {
     
     pinMode(PIN_LED, OUTPUT);
     ledFire(50,0);
-    
+
     pinMode(PIN_OE, OUTPUT);
-    digitalWrite(PIN_OE, LOW);
+    digitalWrite(PIN_OE, HIGH); // disable LED driver    
 
     for(int i=0; i<ADDR_IN_COUNT; i++) {
         pinMode(PIN_IN[i], INPUT_PULLUP_EN ? INPUT_PULLUP : INPUT);
@@ -68,7 +70,13 @@ void setup() {
     
     pwm.begin();
     pwm.setPWMFreq(1600);
-    sendOutput();
+    pwm.setOutputMode(false); // open drain
+    for(int i=0; i<ADDR_OUT_COUNT; i++) {
+        sendOutput(i, 0);
+        maxOutputVals[i] = 4096;
+    }
+
+    digitalWrite(PIN_OE, LOW); // enable LED driver
     
     LocoNet.init(PIN_TX);  
 
@@ -111,13 +119,11 @@ constexpr uint8_t BITS = 2;
 constexpr uint8_t RES = 1<<BITS; // 4 pwm values
 constexpr uint8_t P = RES-1;
 
-void sendOutput() {
-    
-    pwm.setPWM(pwmnum, 0, (i + (4096/16)*pwmnum) % 4096 );
+static inline void sendOutput(uint8_t ch, uint16_t val) {
+    pwm.setPin(ch, val, true);
 }
+
 void changeOutput(uint8_t ch, uint8_t val) {
-    uint8_t pwm;
-    uint8_t h2;
     if(bitRead(output, ch)==val)  return;
 
     Serial.print(F("Setting channel "));
@@ -126,24 +132,16 @@ void changeOutput(uint8_t ch, uint8_t val) {
     Serial.println(val);
 
     if(fade) {
+        uint16_t dst = val * maxOutputVals[ch];
+        uint16_t src = (dst==0)?maxOutputVals[ch] : 0;
         for(int i=0; i<RES; i++) {
-            pwm = val==1 ? i : (P-i);
-    
-            unsigned long tstart = millis();
-            while(millis()-tstart < TRANS_TIME/RES ) {
-                if(h2<pwm) {
-                    bitSet(output, ch);
-                    h2 += P-pwm;
-                } else {
-                    bitClear(output, ch);
-                    h2 -= pwm;
-                }
-                sendOutput();
-            }
+            uint16_t t = src + (dst-src)*i/RES;
+            sendOutput(ch, t);
+            delay(TRANS_TIME);
         }
     }
     bitWrite(output, ch, val);
-    sendOutput();
+    sendOutput(ch, val==0 ? 0 : maxOutputVals[ch]);
     reportChannelState(ch);
 }
 
