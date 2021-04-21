@@ -32,7 +32,8 @@ constexpr uint8_t ID_SWVER = 1;
 
 uint16_t startOutAddr;
 uint16_t output;
-uint16_t maxOutputVals[ADDR_OUT_COUNT];
+constexpr int CH_OUT_COUNT = 16;
+uint16_t maxOutputVals[CH_OUT_COUNT];
 
 bool fade;
 
@@ -51,6 +52,7 @@ constexpr int LED_INTL_CONFIG2 = 150;
 
 void ledFire(uint32_t, uint8_t);
 void ledStop();
+static void sendOutput(uint8_t ch, uint16_t val);
 
 void setup() {
     Serial.begin(115200);
@@ -71,12 +73,14 @@ void setup() {
     pwm.begin();
     pwm.setPWMFreq(1600);
     pwm.setOutputMode(false); // open drain
-    for(int i=0; i<ADDR_OUT_COUNT; i++) {
+    for(int i=0; i<CH_OUT_COUNT; i++) {
         sendOutput(i, 0);
-        maxOutputVals[i] = 4096;
+        maxOutputVals[i] = 1024;
     }
+    maxOutputVals[1] = 128;
 
     digitalWrite(PIN_OE, LOW); // enable LED driver
+    
     
     LocoNet.init(PIN_TX);  
 
@@ -113,11 +117,8 @@ int hex2int(char ch) {
     return -1;
 }
 
-// https://matthewearl.github.io/2015/03/05/efficient-pwm/
 constexpr uint32_t TRANS_TIME = 100; // ms
-constexpr uint8_t BITS = 2;
-constexpr uint8_t RES = 1<<BITS; // 4 pwm values
-constexpr uint8_t P = RES-1;
+constexpr uint8_t RES = 8;
 
 static inline void sendOutput(uint8_t ch, uint16_t val) {
     pwm.setPin(ch, val, true);
@@ -131,17 +132,18 @@ void changeOutput(uint8_t ch, uint8_t val) {
     Serial.print(F(" to "));
     Serial.println(val);
 
+    int16_t dst = val * maxOutputVals[ch];
     if(fade) {
-        uint16_t dst = val * maxOutputVals[ch];
-        uint16_t src = (dst==0)?maxOutputVals[ch] : 0;
-        for(int i=0; i<RES; i++) {
+        int16_t src = (dst==0)?maxOutputVals[ch] : 0;
+        //Serial.println(String("src=")+src+"; dst="+dst);
+        for(uint8_t i=0; i<RES; i++) {
             uint16_t t = src + (dst-src)*i/RES;
             sendOutput(ch, t);
-            delay(TRANS_TIME);
+            delay(TRANS_TIME/RES);
         }
     }
     bitWrite(output, ch, val);
-    sendOutput(ch, val==0 ? 0 : maxOutputVals[ch]);
+    sendOutput(ch, dst);
     reportChannelState(ch);
 }
 
@@ -269,10 +271,37 @@ void loop() {
 
     
     if (Serial.available()>0) {
-        uint8_t ch = hex2int(Serial.read());
-        if(ch>=0 && ch<16) {
-            changeOutput(ch, 1-bitRead(output, ch));    
-        }
+        int t = Serial.read();
+        switch(t) {
+
+            case 'h':
+                Serial.println("HIGH");
+                digitalWrite(PIN_OE, HIGH); // disable LED driver    
+                break;
+            case 'l':
+                Serial.println("LOW");
+                digitalWrite(PIN_OE, LOW);     
+                break;
+            case 'o':
+                Serial.println("OUT");
+                pinMode(PIN_OE, OUTPUT);
+                break;
+            case 'i':
+                Serial.println("IN");
+                pinMode(PIN_OE, INPUT);
+                break;
+            case ' ':
+                changeOutput(0, 1-bitRead(output, 0));    
+                break;
+            default:
+                uint8_t ch = hex2int(t);
+                if(ch>=0 && ch<16) {
+                    changeOutput(ch, 1-bitRead(output, ch));    
+                }
+                break;
+        }        
+        
+        
     }
 
     /*
@@ -348,7 +377,6 @@ void notifySwitchRequest( uint16_t addr, uint8_t out, uint8_t dir ) {
         }
         ledFire(2000);
     }
-
 
 }
 
