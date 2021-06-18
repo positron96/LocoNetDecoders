@@ -2,7 +2,7 @@
 
 #include <Adafruit_PWMServoDriver.h>
 
-constexpr int PIN_OE = 6;
+constexpr int PIN_OE = 3;
 
 constexpr int PIN_LED = 10;
 constexpr int PIN_BT = 2;
@@ -14,7 +14,7 @@ constexpr int ADDR_OUT_COUNT = 16;
 constexpr int ADDR_IN_COUNT = 8;
 
 constexpr bool INPUT_PULLUP_EN = false;
-constexpr int PIN_IN[ADDR_IN_COUNT] = {A0, A1, A2, A3, A5, A4, 5, 4};
+constexpr int PIN_IN[ADDR_IN_COUNT] = {11, 10, A0, A1, A2, A3, 7, 6};
 
 Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver(0x40);
 
