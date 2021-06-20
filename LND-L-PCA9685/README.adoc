@@ -1,0 +1,26 @@
+## LND-L-PCA9685 - A 16 LED LocoNet decoder
+
+This is a firmware for LocoNet-only accessory decoder for 16 LEDs.
+
+PCA9685 board (or bare IC) is used to controll LEDs. 
+Theoretically, 64 PCA9685 boards are supported, giving 1024 possible LEDs. At the moment the firmware supports only 16 LEDs.
+
+Features:
+
+* Smooth lightup/fade
+* OpSwitch-like configuration 
+* UART-debug
+
+Extra functionality:
+
+* 8 digital inputs value (reported to LocoNet)
+* 2 analog inputs
+
+### Hardware
+
+Board:
+
+https://oshwlab.com/positron96/loconet-decoder-2_copy_copy_copy[Decoder mainboard at OSHWLAB]
+
+https://oshwlab.com/positron96/test-pcb-pattern_copy[LocoNet breakout board at OSHWLAB]
+
