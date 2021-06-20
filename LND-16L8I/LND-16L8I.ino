@@ -2,6 +2,10 @@
 
 #include <Adafruit_PWMServoDriver.h>
 
+template<class T> inline Print &operator <<(Print &obj, T arg) { obj.print(arg); return obj; }
+template<class T> inline Print &operator <<=(Print &obj, T arg) { obj.println(arg); return obj; }
+
+
 constexpr int PIN_OE = 3;
 
 constexpr int PIN_LED = 10;
@@ -13,8 +17,8 @@ constexpr int PIN_RX = 8;
 constexpr int ADDR_OUT_COUNT = 16;
 constexpr int ADDR_IN_COUNT = 8;
 
-constexpr bool INPUT_PULLUP_EN = false;
-constexpr int PIN_IN[ADDR_IN_COUNT] = {11, 10, A0, A1, A2, A3, 7, 6};
+constexpr bool INPUT_PULLUP_EN = true;
+constexpr int PIN_IN[ADDR_IN_COUNT] = {11, 12, A0, A1, A2, A3, 7, 6};
 
 Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver(0x40);
 
@@ -43,6 +47,8 @@ bool configMode = false;
 uint16_t configVar = 0;
 uint32_t ledNextUpdate;
 uint8_t ledVal;
+
+constexpr uint16_t INPUT_DEBOUNCE_INTL = 10;
 
 constexpr uint16_t BUTTON_LONG_PRESS_DURATION = 3000;
 
@@ -77,7 +83,7 @@ void setup() {
         sendOutput(i, 0);
         maxOutputVals[i] = 1024;
     }
-    maxOutputVals[1] = 128;
+    //maxOutputVals[1] = 128;
 
     digitalWrite(PIN_OE, LOW); // enable LED driver
     
@@ -100,14 +106,11 @@ void setup() {
     startInAddr = startOutAddr;
     fade = sv.readSVStorage(SV_ADDR_FADING) != 0;
     
-    Serial.print(F("Output start address is "));
-    Serial.println(startOutAddr);
-    Serial.print(F("Input start address is "));
-    Serial.println(startInAddr);
-    Serial.print(F("Fade is "));
-    Serial.println(fade?"On":"Off");
+    Serial<< F("Output start address is ") <<= startOutAddr;
+    Serial<< F("Input start address is ") <<= startInAddr;
+    Serial<< F("Fade is ") <<= fade?"On":"Off";
 
-    Serial.println(F("Init done"));
+    Serial<<= F("Init done");
 }
 
 int hex2int(char ch) {
@@ -127,10 +130,7 @@ static inline void sendOutput(uint8_t ch, uint16_t val) {
 void changeOutput(uint8_t ch, uint8_t val) {
     if(bitRead(output, ch)==val)  return;
 
-    Serial.print(F("Setting channel "));
-    Serial.print(ch);
-    Serial.print(F(" to "));
-    Serial.println(val);
+    Serial<<F("Setting channel ")<<ch<<F(" to ")<<=val;
 
     int16_t dst = val * maxOutputVals[ch];
     if(fade) {
@@ -165,7 +165,7 @@ void checkButton() {
     static uint8_t lastBt;
     static long btPressTime = 0;
     uint8_t bt = 1-digitalRead(PIN_BT); // it's inverted
-    if(lastBt==0 && bt==1) {
+    if(bt==1 && lastBt==0) {
         //Serial.println("Button down");
         btPressTime = millis();
         if(configMode) Serial.println("Quitting config mode");
@@ -204,14 +204,11 @@ void checkInputs() {
             primeTime[i] = millis();
             lastIns[i] = in;
         }
-        if( (primeTime[i] != 0) && (millis()-primeTime[i]>=10) ) {
+        if( (primeTime[i] != 0) && (millis()-primeTime[i]>=INPUT_DEBOUNCE_INTL) ) {
             if(lastIns[i] == in) {
                 // in = jitter-free value
                 uint16_t inAddr = startInAddr+i;
-                Serial.print(F("Input pin "));
-                Serial.print(inAddr);
-                Serial.print(F(" changed to "));
-                Serial.println(in);
+                Serial<<F("Input ")<<i<<"(addr "<<inAddr<<F(") changed to ")<<=in;
                 ledFire(100);
                 LocoNet.reportSensor(inAddr, in);
             } 
@@ -221,17 +218,51 @@ void checkInputs() {
     }
 }
 
+/** 
+ * @see https://github.com/JMRI/JMRI/blob/master/java/src/jmri/jmrix/loconet/LNCPSignalMast.java#L71 
+ *      for packet processing example
+ * @see https://www.nmra.org/sites/default/files/s-9.2.1_2012_07.pdf for NMRA packet
+ * @see https://github.com/JMRI/JMRI/blob/master/java/src/jmri/NmraPacket.java#L652 for NMRA packet address
+*/
+void processImmPacket(sendPktMsg &m) {
+    if(m.val7f != 0x7F) return;
+    uint8_t len = (m.reps & 0b01110000)>> 4;
+    Serial<<"Imm packet of len "<<=len;
+    if(len!=3) return;
+    uint8_t d[3] = { m.im1, m.im2, m.im3 };
+    for(uint8_t i=0; i<3; i++) {
+        if(m.dhi & (1<<i) ) d[i] |= 0b10000000;
+    }
+    if(d[0]>>6 != 0b10 && d[1]>>7 != 1) return; // not an accessory packet
+    uint16_t addr =(( d[0] & 0b00111111)<<2 // mid
+                  | ( d[1] & 0b110)>>1  // low
+                  | (~d[1] & 0b01110000)<<(8-4) // high
+                  ) + 1;
+    Serial<<"Imm address = "<<=addr;
+    if(addr>=startOutAddr && addr<=startOutAddr+ADDR_OUT_COUNT) {
+        uint8_t aspect = d[2]; 
+        Serial<<"aspect="<<=aspect;
+        ledFire(100);
+
+        uint8_t ch = (addr-startOutAddr)*4 + aspect; 
+        uint8_t val = 1;
+        changeOutput(ch, val);    
+    }
+}
 
 void loop() {
     static bool deferredProcessingNeeded = false;
 
     lnMsg *msg = LocoNet.receive() ;
     if ( msg!=nullptr ) {
-        
+
+        if(msg->data[0] == OPC_IMM_PACKET) {
+            processImmPacket(msg->sp);
+                        
+        } else
         if (!LocoNet.processSwitchSensorMessage(msg)) {
             SV_STATUS svStatus = sv.processMessage(msg);
-            Serial.print("LNSV processMessage - Status: ");
-            Serial.println(svStatus);
+            Serial<<F("LNSV processMessage - Status: ")<<=svStatus;
             deferredProcessingNeeded = (svStatus == SV_DEFERRED_PROCESSING_NEEDED);
         } else {
         }
