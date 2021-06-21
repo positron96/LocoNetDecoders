@@ -2,6 +2,8 @@
 
 #include <Adafruit_PWMServoDriver.h>
 
+#include "MastManager.h"
+
 template<class T> inline Print &operator <<(Print &obj, T arg) { obj.print(arg); return obj; }
 template<class T> inline Print &operator <<=(Print &obj, T arg) { obj.println(arg); return obj; }
 
@@ -20,8 +22,6 @@ constexpr int ADDR_IN_COUNT = 8;
 constexpr bool INPUT_PULLUP_EN = true;
 constexpr int PIN_IN[ADDR_IN_COUNT] = {11, 12, A0, A1, A2, A3, 7, 6};
 
-Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver(0x40);
-
 LocoNetSystemVariableClass sv;
 
 constexpr uint16_t SV_ADDR_FADING = SV_ADDR_USER_BASE;
@@ -34,10 +34,47 @@ constexpr uint8_t ID_DEVLPR = 4;
 constexpr uint8_t ID_PRODUCT = 2;
 constexpr uint8_t ID_SWVER = 1;
 
-uint16_t startOutAddr;
-uint16_t output;
+
 constexpr int CH_OUT_COUNT = 16;
-uint16_t maxOutputVals[CH_OUT_COUNT];
+
+class PCADriver {
+public:
+    static Adafruit_PWMServoDriver pwm;
+    static uint16_t maxOutputVals[CH_OUT_COUNT];
+
+    static void init() {
+
+        pwm = Adafruit_PWMServoDriver(0x40);
+
+        pinMode(PIN_OE, OUTPUT);
+        digitalWrite(PIN_OE, HIGH); // disable LED driver   
+        pwm.begin();
+        pwm.setPWMFreq(1600);
+        pwm.setOutputMode(false); // open drain
+        for(int i=0; i<CH_OUT_COUNT; i++) {
+            set(i, 0);
+            maxOutputVals[i] = 1024;
+        }
+        digitalWrite(PIN_OE, LOW); // enable LED driver
+    }
+    static void set(uint16_t pin, uint8_t val) {
+        pwm.setPin(pin, val!=0 ? maxOutputVals[pin] : 0, true);
+    }
+    static void set(uint16_t pin0, uint8_t val, uint8_t ofs1, uint8_t ofs2) {
+        pwm.setPin(pin0+ofs1, val!=0 ? maxOutputVals[pin0+ofs1] : 0, true);
+        pwm.setPin(pin0+ofs2, val!=0 ? maxOutputVals[pin0+ofs2] : 0, true);
+    }
+    static uint8_t get(uint16_t pin) {
+        return pwm.getPWM(pin) == 1 ? 0 : 1; // it's probably inverted
+    }
+    static void toggle(uint16_t pin) {
+        set(pin, get(pin)==0 ? 1 : 0); 
+    }
+};
+Adafruit_PWMServoDriver PCADriver::pwm;
+uint16_t PCADriver::maxOutputVals[CH_OUT_COUNT];
+
+MastManager<CH_OUT_COUNT, 16, PCADriver> masts;
 
 bool fade;
 
@@ -58,7 +95,7 @@ constexpr int LED_INTL_CONFIG2 = 150;
 
 void ledFire(uint32_t, uint8_t);
 void ledStop();
-static void sendOutput(uint8_t ch, uint16_t val);
+//static void sendOutput(uint8_t ch, uint16_t val);
 
 void setup() {
     Serial.begin(115200);
@@ -69,23 +106,14 @@ void setup() {
     pinMode(PIN_LED, OUTPUT);
     ledFire(50,0);
 
-    pinMode(PIN_OE, OUTPUT);
-    digitalWrite(PIN_OE, HIGH); // disable LED driver    
-
     for(int i=0; i<ADDR_IN_COUNT; i++) {
         pinMode(PIN_IN[i], INPUT_PULLUP_EN ? INPUT_PULLUP : INPUT);
     }
-    
-    pwm.begin();
-    pwm.setPWMFreq(1600);
-    pwm.setOutputMode(false); // open drain
-    for(int i=0; i<CH_OUT_COUNT; i++) {
-        sendOutput(i, 0);
-        maxOutputVals[i] = 1024;
-    }
-    //maxOutputVals[1] = 128;
 
-    digitalWrite(PIN_OE, LOW); // enable LED driver
+    PCADriver::init();
+
+    masts.addMast(10, 0, 2);
+    masts.addMast(11, 2, 3);
     
     
     LocoNet.init(PIN_TX);  
@@ -102,11 +130,11 @@ void setup() {
         sv.writeSVNodeId(DEFAULT_ADDR);
     }
 
-    startOutAddr = sv.readSVNodeId(); 
-    startInAddr = startOutAddr;
+    //startOutAddr = sv.readSVNodeId(); 
+    startInAddr = 10;
     fade = sv.readSVStorage(SV_ADDR_FADING) != 0;
     
-    Serial<< F("Output start address is ") <<= startOutAddr;
+    //Serial<< F("Output start address is ") <<= startOutAddr;
     Serial<< F("Input start address is ") <<= startInAddr;
     Serial<< F("Fade is ") <<= fade?"On":"Off";
 
@@ -123,10 +151,11 @@ int hex2int(char ch) {
 constexpr uint32_t TRANS_TIME = 100; // ms
 constexpr uint8_t RES = 8;
 
-static inline void sendOutput(uint8_t ch, uint16_t val) {
-    pwm.setPin(ch, val, true);
-}
+// static inline void sendOutput(uint8_t ch, uint16_t val) {
+//     pwm.setPin(ch, val, true);
+// }
 
+/*
 void changeOutput(uint8_t ch, uint8_t val) {
     if(bitRead(output, ch)==val)  return;
 
@@ -145,7 +174,7 @@ void changeOutput(uint8_t ch, uint8_t val) {
     bitWrite(output, ch, val);
     sendOutput(ch, dst);
     reportChannelState(ch);
-}
+}*/
 
 void ledFire(uint32_t ms, uint8_t val=1) {
     ledVal = val;
@@ -211,7 +240,7 @@ void checkInputs() {
                 Serial<<F("Input ")<<i<<"(addr "<<inAddr<<F(") changed to ")<<=in;
                 ledFire(100);
                 LocoNet.reportSensor(inAddr, in);
-            } 
+            }
             lastIns[i] = in;
             primeTime[i] = 0;
         }
@@ -239,15 +268,18 @@ void processImmPacket(sendPktMsg &m) {
                   | (~d[1] & 0b01110000)<<(8-4) // high
                   ) + 1;
     Serial<<"Imm address = "<<=addr;
-    if(addr>=startOutAddr && addr<=startOutAddr+ADDR_OUT_COUNT) {
+    //if(addr>=startOutAddr && addr<=startOutAddr+ADDR_OUT_COUNT) {
         uint8_t aspect = d[2]; 
         Serial<<"aspect="<<=aspect;
         ledFire(100);
+        int16_t idx = masts.findAddr(addr);
+        if(idx>=0)
+            masts.setAspect(idx, aspect);
 
-        uint8_t ch = (addr-startOutAddr)*4 + aspect; 
-        uint8_t val = 1;
-        changeOutput(ch, val);    
-    }
+        //uint8_t ch = (addr-startOutAddr)*4 + aspect; 
+        //uint8_t val = 1;
+        //changeOutput(ch, val);    
+    //}
 }
 
 void loop() {
@@ -322,12 +354,12 @@ void loop() {
                 pinMode(PIN_OE, INPUT);
                 break;
             case ' ':
-                changeOutput(0, 1-bitRead(output, 0));    
+                masts.setAspect(0, 1-masts.getAspect(0) );    
                 break;
             default:
                 uint8_t ch = hex2int(t);
                 if(ch>=0 && ch<16) {
-                    changeOutput(ch, 1-bitRead(output, ch));    
+                    masts.setAspect(ch, 1-masts.getAspect(ch) );    
                 }
                 break;
         }        
@@ -383,12 +415,10 @@ void notifySwitchRequest( uint16_t addr, uint8_t out, uint8_t dir ) {
     if(!on) return;
 
     if(!configMode) {
-        if(addr >= startOutAddr && addr<startOutAddr+ADDR_OUT_COUNT) {
+        uint16_t idx = masts.findAddr(addr);
+        if(idx>=0) {
             ledFire(100);
-
-            uint8_t ch = (addr-startOutAddr); // requested pin
-            uint8_t val = thrown?1:0;
-            changeOutput(ch, val);    
+            masts.setAspect(idx, thrown?1:0);
         }
         return;
     }
@@ -400,10 +430,10 @@ void notifySwitchRequest( uint16_t addr, uint8_t out, uint8_t dir ) {
             Serial.print("Var=");
             Serial.println(configVar);
         } else {
-            startOutAddr = addr;
+            //startOutAddr = addr;
             //sv.writeSvNodeId(startOut);
             Serial.print("Changed start address to ");
-            Serial.println(startOutAddr);
+            //Serial.println(startOutAddr);
             configVar = 0;
         }
         ledFire(2000);
@@ -411,6 +441,7 @@ void notifySwitchRequest( uint16_t addr, uint8_t out, uint8_t dir ) {
 
 }
 
+/*
 void reportChannelState(uint8_t ch) {
     uint16_t addr = startOutAddr+ch;
     addr -= 1;
@@ -421,6 +452,7 @@ void reportChannelState(uint8_t ch) {
         |  (bitRead(output,ch) ? OPC_SW_REP_THROWN: OPC_SW_REP_CLOSED)  ;
     LocoNet.send(&txMsg);
 }
+*/
 
 
 void notifySVChanged(uint16_t offs){
