@@ -14,7 +14,7 @@ Features:
 
 Extra functionality:
 
-* 8 digital inputs value (reported to LocoNet)
+* 8 digital inputs value that are reported to LocoNet (Can be used as sensor board)
 * 2 analog inputs
 
 ### Hardware
@@ -25,11 +25,11 @@ The firmware is designed to work with this decoder board:
 
 * https://oshwlab.com/positron96/test-pcb-pattern_copy[LocoNet breakout board at OSHWLAB]
 
-The board features
+The board features:
 
 * Arduino Pro Mini socket
 * PCA9685 board socket
-* 2 LocoNet ports
+* 2 LocoNet jacks
 * Can be powered through LocoNet bus or from external power connector
 * Button to enter configuration
 * Indicator LED
