@@ -1,11 +1,11 @@
 #include <LocoNet.h>
 
-#include <Adafruit_PWMServoDriver.h>
-
-#include "MastManager.h"
-
 template<class T> inline Print &operator <<(Print &obj, T arg) { obj.print(arg); return obj; }
 template<class T> inline Print &operator <<=(Print &obj, T arg) { obj.println(arg); return obj; }
+
+//#include <etl/Embedded_Template_Library.h>
+#include "MastManager.h"
+#include "PCA9685Driver.h"
 
 
 constexpr int PIN_OE = 3;
@@ -34,47 +34,8 @@ constexpr uint8_t ID_DEVLPR = 4;
 constexpr uint8_t ID_PRODUCT = 2;
 constexpr uint8_t ID_SWVER = 1;
 
-
-constexpr int CH_OUT_COUNT = 16;
-
-class PCADriver {
-public:
-    static Adafruit_PWMServoDriver pwm;
-    static uint16_t maxOutputVals[CH_OUT_COUNT];
-
-    static void init() {
-
-        pwm = Adafruit_PWMServoDriver(0x40);
-
-        pinMode(PIN_OE, OUTPUT);
-        digitalWrite(PIN_OE, HIGH); // disable LED driver   
-        pwm.begin();
-        pwm.setPWMFreq(1600);
-        pwm.setOutputMode(false); // open drain
-        for(int i=0; i<CH_OUT_COUNT; i++) {
-            set(i, 0);
-            maxOutputVals[i] = 1024;
-        }
-        digitalWrite(PIN_OE, LOW); // enable LED driver
-    }
-    static void set(uint16_t pin, uint8_t val) {
-        pwm.setPin(pin, val!=0 ? maxOutputVals[pin] : 0, true);
-    }
-    static void set(uint16_t pin0, uint8_t val, uint8_t ofs1, uint8_t ofs2) {
-        pwm.setPin(pin0+ofs1, val!=0 ? maxOutputVals[pin0+ofs1] : 0, true);
-        pwm.setPin(pin0+ofs2, val!=0 ? maxOutputVals[pin0+ofs2] : 0, true);
-    }
-    static uint8_t get(uint16_t pin) {
-        return pwm.getPWM(pin) == 1 ? 0 : 1; // it's probably inverted
-    }
-    static void toggle(uint16_t pin) {
-        set(pin, get(pin)==0 ? 1 : 0); 
-    }
-};
-Adafruit_PWMServoDriver PCADriver::pwm;
-uint16_t PCADriver::maxOutputVals[CH_OUT_COUNT];
-
-MastManager<CH_OUT_COUNT, 16, PCADriver> masts;
+using PCADriver = PCA9685Driver<PIN_OE>;
+MastManager<16, PCADriver> masts;
 
 bool fade;
 
@@ -112,9 +73,8 @@ void setup() {
 
     PCADriver::init();
 
-    masts.addMast(10, 0, 2);
-    masts.addMast(11, 2, 3);
-    
+    masts.addMast(10, 0, 3);
+    masts.addMast(11, 3, 2);    
     
     LocoNet.init(PIN_TX);  
 
@@ -147,9 +107,6 @@ int hex2int(char ch) {
     if (ch >= 'a' && ch <= 'f') return ch - 'a' + 10;
     return -1;
 }
-
-constexpr uint32_t TRANS_TIME = 100; // ms
-constexpr uint8_t RES = 8;
 
 // static inline void sendOutput(uint8_t ch, uint16_t val) {
 //     pwm.setPin(ch, val, true);
@@ -319,6 +276,8 @@ void loop() {
         ledNextUpdate += millis();
     }
 
+    masts.tick();
+
     /*
     static long nextInRead = 0;
     static int lastV=0;
@@ -359,9 +318,11 @@ void loop() {
             default:
                 uint8_t ch = hex2int(t);
                 if(ch>=0 && ch<16) {
-                    masts.setAspect(ch, 1-masts.getAspect(ch) );    
+                    //PCADriver::toggle(ch);
+                    masts.setAspect(0, ch );    
                 }
                 break;
+
         }        
         
         

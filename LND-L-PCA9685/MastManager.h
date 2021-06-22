@@ -4,7 +4,7 @@
 #undef min
 #undef max
 #include <etl/vector.h>
-#include <etl/array.h>
+#include <etl/type_traits.h>
 
 /*
 class OD {
@@ -20,15 +20,15 @@ template<class OutputDriver>
 class Mast {
 public:
     uint16_t busAddr;
-    uint16_t outputAddr;
+    uint16_t ch;
     uint8_t curAspect;
     uint8_t nheads;
     uint32_t lastChangeTime;
 public:
 
-    Mast(uint16_t busAddress, uint16_t outputAddress, uint8_t nheads)
+    Mast(uint16_t busAddress, uint16_t outputChannel, uint8_t nheads)
         : busAddr(busAddress)
-        , outputAddr(outputAddress)
+        , ch(outputChannel)
         , nheads(nheads) 
     {
         
@@ -36,6 +36,7 @@ public:
 
     void setAspect(uint8_t aspect) {
         curAspect = aspect;
+        lastChangeTime = 0;
         switch(nheads) {
             case 1: { // 1-head
                 set1head();
@@ -78,16 +79,16 @@ private:
         switch(curAspect) {
             case 2:
                 lastChangeTime = millis();
-            case 1: OutputDriver::set(outputAddr, 1); break;
-            case 3: OutputDriver::set(outputAddr, 0); break;
+            case 1: OutputDriver::set(ch, 1); break;
+            case 3: OutputDriver::set(ch, 0); break;
         }
         
     }
 
     void tick1head() {
-        if(lastChangeTime-millis() > BLINK_DUR) {
+        if(millis() - lastChangeTime > BLINK_DUR) {
             if(curAspect==2) {
-                OutputDriver::toggle(outputAddr);
+                OutputDriver::toggle(ch);
                 lastChangeTime = millis();
             }
         }
@@ -100,27 +101,27 @@ private:
             case 4: 
                 lastChangeTime = millis();
             case 1: 
-                OutputDriver::set(outputAddr+1, 0); 
-                OutputDriver::set(outputAddr, 1); 
+                OutputDriver::set(ch+1, 0); 
+                OutputDriver::set(ch, 1); 
                 break;
             case 2:
-                OutputDriver::set(outputAddr, 0); 
-                OutputDriver::set(outputAddr+1, 1); 
+                OutputDriver::set(ch, 0); 
+                OutputDriver::set(ch+1, 1); 
                 break;
             case 5: 
-                OutputDriver::set(outputAddr, 0, 0,1); 
+                OutputDriver::set2(ch, 0, 0,1); 
                 break;
         }
     }
 
     void tick2head() {
-        if(lastChangeTime-millis() > BLINK_DUR) {
+        if(millis() - lastChangeTime > BLINK_DUR) {
             if(curAspect==3) {
-                OutputDriver::toggle(outputAddr);
+                OutputDriver::toggle(ch);
             } else
             if(curAspect==4) {
-                OutputDriver::toggle(outputAddr);
-                OutputDriver::toggle(outputAddr+1);
+                OutputDriver::toggle(ch);
+                OutputDriver::toggle(ch+1);
             }
             lastChangeTime = millis();
         }
@@ -133,60 +134,74 @@ private:
             case 8:
                 lastChangeTime = millis();
             case 1:
-                OutputDriver::set(outputAddr, 0, 0,1 ); 
-                OutputDriver::set(outputAddr+2, 1); 
+                OutputDriver::set2(ch, 0, 0,1 ); 
+                OutputDriver::set(ch+2, 1); 
                 break;
             case 5: 
                 lastChangeTime = millis();
             case 2:
-                OutputDriver::set(outputAddr, 0, 1,2 ); 
-                OutputDriver::set(outputAddr, 1); 
+                OutputDriver::set2(ch, 0, 1,2 ); 
+                OutputDriver::set(ch, 1); 
                 break;
             case 6:
                 lastChangeTime = millis();
             case 3:
-                OutputDriver::set(outputAddr, 0, 0,2); 
-                OutputDriver::set(outputAddr+1, 1); 
+                OutputDriver::set2(ch, 0, 0,2); 
+                OutputDriver::set(ch+1, 1); 
                 break;
             case 7:
                 lastChangeTime = millis();
+                OutputDriver::set2(ch, 0, 1,2); 
+                OutputDriver::set(ch, 1); 
+                break;
             case 9:
-                OutputDriver::set(outputAddr+1, 0); 
-                OutputDriver::set(outputAddr, 1, 0,2); 
+                lastChangeTime = millis();
+                OutputDriver::set(ch+1, 0); 
+                OutputDriver::set2(ch, 1, 0,2); 
                 break;
             case 10: 
-                OutputDriver::set(outputAddr, 0, 0,1);
-                OutputDriver::set(outputAddr+2, 0 );
+                OutputDriver::set2(ch, 0, 0,1);
+                OutputDriver::set(ch+2, 0 );
                 break;
         }
     }
 
     void tick3head() {
-        if(lastChangeTime-millis() > BLINK_DUR) {
+        if(millis() - lastChangeTime > BLINK_DUR) {
             switch(curAspect) {
                 case 5:
-                    OutputDriver::toggle(outputAddr);
+                    OutputDriver::toggle(ch);
                     break;
                 case 6:
-                    OutputDriver::toggle(outputAddr+1);
+                    OutputDriver::toggle(ch+1);
                     break;
                 case 7:
-                    uint8_t cv = OutputDriver::get(outputAddr);
-                    OutputDriver::set(outputAddr, 1-cv, 0,2);
+                    if(OutputDriver::get(ch)) {
+                        OutputDriver::toggle(ch);
+                        OutputDriver::toggle(ch+2);
+                    } else {
+                        OutputDriver::toggle(ch+2);
+                        OutputDriver::toggle(ch);
+                    }
                     break;
                 case 8: 
-                    OutputDriver::toggle(outputAddr+2); 
+                    OutputDriver::toggle(ch+2); 
                     break;
             }
             lastChangeTime = millis();
         }
     }
+
+    /*using fn = etl::add_pointer( void(Mast&) )::type;
+    static fn tickFns[];
+    static fn setFns[];*/
+
 };
 
 
 
 
-template<uint16_t MAX_OUTPUTS, uint8_t MAX_MASTS, class OutputDriver>
+template<uint8_t MAX_MASTS, class OutputDriver>
 class MastManager {
 
 public:
@@ -212,6 +227,10 @@ public:
 
     void addMast(uint16_t busAddr, uint16_t outputAddr, uint8_t nheads) {
         masts.push_back( TMast{busAddr, outputAddr, nheads} ) ;
+    }
+
+    void tick() {
+        for(auto &m: masts) m.tick();
     }
 
 private:
