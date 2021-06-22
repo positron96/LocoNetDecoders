@@ -73,8 +73,9 @@ void setup() {
 
     PCADriver::init();
 
-    masts.addMast(10, 0, 3);
-    masts.addMast(11, 3, 2);    
+    masts.addMast(11, 1, 2);    
+    masts.addMast(10, 0, 1);
+    
     
     LocoNet.init(PIN_TX);  
 

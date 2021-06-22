@@ -116,12 +116,19 @@ private:
 
     void tick2head() {
         if(millis() - lastChangeTime > BLINK_DUR) {
-            if(curAspect==3) {
+            switch(curAspect) {
+            case 3:
                 OutputDriver::toggle(ch);
-            } else
-            if(curAspect==4) {
-                OutputDriver::toggle(ch);
-                OutputDriver::toggle(ch+1);
+                break;
+            case 4:
+                if(OutputDriver::get(ch)) {
+                    OutputDriver::set(ch+1, 1);
+                    OutputDriver::set(ch, 0);
+                } else {
+                    OutputDriver::set(ch, 1);
+                    OutputDriver::set(ch+1, 0);
+                }
+                break;
             }
             lastChangeTime = millis();
         }
@@ -177,11 +184,11 @@ private:
                     break;
                 case 7:
                     if(OutputDriver::get(ch)) {
-                        OutputDriver::toggle(ch);
-                        OutputDriver::toggle(ch+2);
+                        OutputDriver::set(ch+2, 1);
+                        OutputDriver::set(ch, 0);
                     } else {
-                        OutputDriver::toggle(ch+2);
-                        OutputDriver::toggle(ch);
+                        OutputDriver::set(ch, 1);
+                        OutputDriver::set(ch+2, 0);
                     }
                     break;
                 case 8: 

@@ -31,14 +31,14 @@ public:
         digitalWrite(PIN_OE, LOW); // enable LED driver
     }
 
-    static void set(uint16_t ch, uint8_t val) {
+    static void set(uint16_t ch, bool val) {
         if(get(ch)==val) return;
 
-        Serial<<F("Setting channel ")<<ch<<F(" to ")<<=val;
+        //Serial<<F("Setting channel ")<<ch<<F(" to ")<<=val;
 
-        int16_t dst = val!=0 ? (maxOutputVals[ch]<<4) : 0;
+        int16_t dst = val ? (maxOutputVals[ch]<<4) : 0;
         if(fade[ch]) {
-            int16_t src = (val==0)?(maxOutputVals[ch]<<4) : 0;
+            int16_t src = (!val)?(maxOutputVals[ch]<<4) : 0;
             for(uint8_t i=0; i<RES; i++) {
                 uint16_t t = src + (dst-src)*i/RES;
                 pwm.setPin(ch, t, true);
@@ -46,23 +46,38 @@ public:
             }
         }
         pwm.setPin(ch, dst, true);
-        curVal[ch] = val!=0;
+        curVal[ch] = val;
     }
 
-    static void set2(uint16_t ch0, uint8_t val, uint8_t ofs1, uint8_t ofs2) {
-        if(get(ch0+ofs1)==val && get(ch0+ofs2)==val) return;
-        pwm.setPin(ch0+ofs1, val!=0 ? maxOutputVals[ch0+ofs1]<<4 : 0, true);
-        pwm.setPin(ch0+ofs2, val!=0 ? maxOutputVals[ch0+ofs2]<<4 : 0, true);
-        curVal[ch0+ofs1] = val!=0;
-        curVal[ch0+ofs2] = val!=0;
+    static void set2(uint16_t ch0, bool val, uint8_t ofs1, uint8_t ofs2) {
+        uint16_t ch1=ch0+ofs1, ch2=ch0+ofs2;
+        if(get(ch1)==val && get(ch2)==val) return;
+
+        int16_t dst1 = val ? (maxOutputVals[ch1]<<4) : 0;
+        int16_t dst2 = val ? (maxOutputVals[ch2]<<4) : 0;
+        if(fade[ch0+ofs1]) {
+            int16_t src1 = get(ch1)?(maxOutputVals[ch1]<<4) : 0;
+            int16_t src2 = get(ch2)?(maxOutputVals[ch2]<<4) : 0;
+            for(uint8_t i=0; i<RES; i++) {
+                uint16_t t1 = src1 + (dst1-src1)*i/RES;
+                uint16_t t2 = src2 + (dst2-src2)*i/RES;
+                pwm.setPin(ch1, t1, true);
+                pwm.setPin(ch2, t2, true);
+                delay(TRANS_TIME/RES);
+            }
+        }
+        pwm.setPin(ch1, dst1, true);
+        pwm.setPin(ch2, dst2, true);
+        curVal[ch1] = val;
+        curVal[ch2] = val;
     }
 
-    static uint8_t get(uint16_t pin) {
-        return curVal[pin] ? 1 : 0;
+    static bool get(uint16_t pin) {
+        return curVal[pin];
     }
 
     static void toggle(uint16_t pin) {
-        set(pin, get(pin)==0 ? 1 : 0); 
+        set(pin, !get(pin)); 
     }
 
 private:
