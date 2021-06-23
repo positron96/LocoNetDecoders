@@ -34,6 +34,7 @@
 // MODE2 bits
 #define MODE2_OUTNE_0 0x01 /**< Active LOW output enable input */
 #define MODE2_OUTNE_1 0x02 /**< Active LOW output enable input - high impedience */
+#define MODE2_OUTNE_MASK 0x03
 #define MODE2_OUTDRV 0x04 /**< totem pole structure vs open-drain */
 #define MODE2_OCH 0x08    /**< Outputs change on ACK vs STOP */
 #define MODE2_INVRT 0x10  /**< Output logic state inverted */
@@ -54,6 +55,9 @@
  */
 class PCA9685Driver {
 public:
+
+  enum class OeMode { LOWVAL, HIGHZ, OUTDRV };
+
   PCA9685Driver();
   PCA9685Driver(const uint8_t addr);
   PCA9685Driver(const uint8_t addr, TwoWire &i2c);
@@ -67,7 +71,9 @@ public:
   void setPWMFreq(float freq);
   void setOutputMode(bool totempole);
   void setOpenDrainOutput() { setOutputMode(false); }
-  void setTotenpoleOutput() { setOutputMode(true); }
+  void setTotempoleOutput() { setOutputMode(true); }
+  void setOeMode(const OeMode m);
+  void setInvertMode(const bool invert);
   //uint8_t getPWM(uint8_t num);
   void setRaw(uint8_t num, uint16_t on, uint16_t off);
   void setPWM(uint8_t num, uint16_t val, bool invert = false);
@@ -78,12 +84,14 @@ public:
   void setOscillatorFrequency(uint32_t freq);
   uint32_t getOscillatorFrequency(void);
 
+  uint8_t read8(uint8_t addr);
+  void write8(uint8_t addr, uint8_t d);
+
 private:
   uint8_t _i2caddr;
   TwoWire *_i2c;
 
   uint32_t _oscillator_freq;
-  uint8_t read8(uint8_t addr);
-  void write8(uint8_t addr, uint8_t d);
+  
 };
 

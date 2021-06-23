@@ -8,7 +8,7 @@
  * TwoWire interface
  */
 PCA9685Driver::PCA9685Driver()
-        : _i2caddr(PCA9685_I2C_DEFAULT_ADDRESS), _i2c(&Wire) {}
+        : PCA9685Driver(PCA9685_I2C_DEFAULT_ADDRESS, Wire) {}
 
 /*!
  *  @brief  Instantiates a new PCA9685 PWM driver chip with the I2C address on a
@@ -16,7 +16,7 @@ PCA9685Driver::PCA9685Driver()
  *  @param  addr The 7-bit I2C address to locate this chip, default is 0x40
  */
 PCA9685Driver::PCA9685Driver(const uint8_t addr)
-        : _i2caddr(addr), _i2c(&Wire) {}
+        : PCA9685Driver(addr, Wire) {}
 
 /*!
  *  @brief  Instantiates a new PCA9685 PWM driver chip with the I2C address on a
@@ -26,9 +26,12 @@ PCA9685Driver::PCA9685Driver(const uint8_t addr)
  *  with
  */
 PCA9685Driver::PCA9685Driver(const uint8_t addr, TwoWire &i2c)
-        : _i2caddr(addr), _i2c(&i2c) {}
+        : _i2caddr(addr), _i2c(&i2c) 
+{
+    setOscillatorFrequency(FREQUENCY_OSCILLATOR_FREQ);
+}
 
-PCA9685Driver::setAddr(const uint8_t addr) {
+void PCA9685Driver::setAddr(const uint8_t addr) {
     _i2caddr = addr;
 }
 
@@ -39,8 +42,9 @@ PCA9685Driver::setAddr(const uint8_t addr) {
  */
 void PCA9685Driver::begin() {
     _i2c->begin();
-    softResetAll();
-    setOscillatorFrequency(FREQUENCY_OSCILLATOR_FREQ);
+    
+    // This sets the MODE1 register to turn on auto increment.
+    write8(PCA9685_MODE1, read8(PCA9685_MODE1) | MODE1_AI);
 }
 
 void PCA9685Driver::softResetAll() {
@@ -50,10 +54,10 @@ void PCA9685Driver::softResetAll() {
 }
 
 /*!
- *  @brief  Sends a restart command to the PCA9685 chip over I2C
+ *  @brief  Sets a restart flag in the PCA9685 chip
  */
 void PCA9685Driver::restart() {
-    write8(PCA9685_MODE1, MODE1_RESTART);
+    write8(PCA9685_MODE1, read8(PCA9685_MODE1) | MODE1_RESTART);
     delay(1);
 }
 
@@ -61,9 +65,8 @@ void PCA9685Driver::restart() {
  *  @brief  Puts board into sleep mode
  */
 void PCA9685Driver::sleep() {
-    uint8_t awake = read8(PCA9685_MODE1);
-    uint8_t sleep = awake | MODE1_SLEEP; // set sleep bit high
-    write8(PCA9685_MODE1, sleep);
+    // set sleep bit high
+    write8(PCA9685_MODE1, read8(PCA9685_MODE1) | MODE1_SLEEP);
     delay(1); // wait until cycle ends for sleep to be active
 }
 
@@ -136,8 +139,6 @@ void PCA9685Driver::setPWMFreq(float freq) {
     write8(PCA9685_PRESCALE, prescale); // set the prescaler
     write8(PCA9685_MODE1, oldmode);
     delay(5);
-    // This sets the MODE1 register to turn on auto increment.
-    write8(PCA9685_MODE1, oldmode | MODE1_RESTART | MODE1_AI);
 
 #ifdef ENABLE_DEBUG_OUTPUT
     Serial.print("Mode now 0x");
@@ -167,6 +168,32 @@ void PCA9685Driver::setOutputMode(bool totempole) {
     Serial.print(" by setting MODE2 to ");
     Serial.println(newmode);
 #endif
+}
+
+void PCA9685Driver::setOeMode(const OeMode m) {
+    uint8_t oldMode = read8(PCA9685_MODE2);
+    uint8_t newMode;
+    if(m==OeMode::LOWVAL) newMode = 0;
+    if(m==OeMode::HIGHZ)  newMode = MODE2_OUTNE_1;
+    if(m==OeMode::OUTDRV) newMode = MODE2_OUTNE_0;
+    newMode = (oldMode & ~MODE2_OUTNE_MASK) | newMode;
+    write8(PCA9685_MODE2, newMode);
+#ifdef ENABLE_DEBUG_OUTPUT
+    Serial.print("Setting OE mode: ");
+    Serial.print(m==OeMode::LOWVAL ? "0" : m==OeMode::HIGHZ? "HighZ" : "OUTDRV-specified");
+    Serial.print(" by setting MODE2 to ");
+    Serial.println(newmode);
+#endif
+}
+
+void PCA9685Driver::setInvertMode(const bool invert) {
+    uint8_t mode = read8(PCA9685_MODE2);
+    if (invert) {
+        mode |= MODE2_INVRT;
+    } else {
+        mode &= ~MODE2_INVRT;
+    }
+    write8(PCA9685_MODE2, mode);
 }
 
 /*!
