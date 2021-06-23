@@ -1,12 +1,13 @@
 #include <LocoNet.h>
 
-#include <Adafruit_PWMServoDriver.h>
+#include "PCA9685Driver.h"
 
 template<class T> inline Print &operator <<(Print &obj, T arg) { obj.print(arg); return obj; }
 template<class T> inline Print &operator <<=(Print &obj, T arg) { obj.println(arg); return obj; }
 
 
-constexpr int PIN_OE = 3;
+constexpr int PIN_VEN = 3;
+constexpr int PIN_OEn = 4;
 
 constexpr int PIN_LED = 10;
 constexpr int PIN_BT = 2;
@@ -20,7 +21,7 @@ constexpr int ADDR_IN_COUNT = 8;
 constexpr bool INPUT_PULLUP_EN = true;
 constexpr int PIN_IN[ADDR_IN_COUNT] = {11, 12, A0, A1, A2, A3, 7, 6};
 
-Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver(0x40);
+PCA9685Driver pwm = PCA9685Driver(0x40);
 
 LocoNetSystemVariableClass sv;
 
@@ -69,8 +70,8 @@ void setup() {
     pinMode(PIN_LED, OUTPUT);
     ledFire(50,0);
 
-    pinMode(PIN_OE, OUTPUT);
-    digitalWrite(PIN_OE, HIGH); // disable LED driver    
+    pinMode(PIN_VEN, OUTPUT);
+    digitalWrite(PIN_VEN, HIGH); // disable LED driver    
 
     for(int i=0; i<ADDR_IN_COUNT; i++) {
         pinMode(PIN_IN[i], INPUT_PULLUP_EN ? INPUT_PULLUP : INPUT);
@@ -78,14 +79,14 @@ void setup() {
     
     pwm.begin();
     pwm.setPWMFreq(1600);
-    pwm.setOutputMode(false); // open drain
+    pwm.setOpenDrainOutput();
+    sendOutput(PCA9685_ALL_LEDS, 0);
     for(int i=0; i<CH_OUT_COUNT; i++) {
-        sendOutput(i, 0);
         maxOutputVals[i] = 1024;
     }
     //maxOutputVals[1] = 128;
 
-    digitalWrite(PIN_OE, LOW); // enable LED driver
+    digitalWrite(PIN_VEN, LOW); // enable LED driver
     
     
     LocoNet.init(PIN_TX);  
@@ -124,7 +125,7 @@ constexpr uint32_t TRANS_TIME = 100; // ms
 constexpr uint8_t RES = 8;
 
 static inline void sendOutput(uint8_t ch, uint16_t val) {
-    pwm.setPin(ch, val, true);
+    pwm.setPWM(ch, val, true);
 }
 
 void changeOutput(uint8_t ch, uint8_t val) {
@@ -304,22 +305,39 @@ void loop() {
     if (Serial.available()>0) {
         int t = Serial.read();
         switch(t) {
+            case 'H':
+                Serial.println("OE HIGH");
+                digitalWrite(PIN_OEn, HIGH); // disable LED driver    
+                break;
+            case 'L':
+                Serial.println("OE LOW");
+                digitalWrite(PIN_OEn, LOW);     
+                break;
+            case 'O':
+                Serial.println("OE OUT");
+                pinMode(PIN_OEn, OUTPUT);
+                break;
+            case 'I':
+                Serial.println("OE IN");
+                pinMode(PIN_OEn, INPUT);
+                break;
+
 
             case 'h':
-                Serial.println("HIGH");
-                digitalWrite(PIN_OE, HIGH); // disable LED driver    
+                Serial.println("VEN HIGH");
+                digitalWrite(PIN_VEN, HIGH); // disable 5Vo    
                 break;
             case 'l':
-                Serial.println("LOW");
-                digitalWrite(PIN_OE, LOW);     
+                Serial.println("VEN LOW");
+                digitalWrite(PIN_VEN, LOW);     
                 break;
             case 'o':
-                Serial.println("OUT");
-                pinMode(PIN_OE, OUTPUT);
+                Serial.println("VEN OUT");
+                pinMode(PIN_VEN, OUTPUT);
                 break;
             case 'i':
-                Serial.println("IN");
-                pinMode(PIN_OE, INPUT);
+                Serial.println("VEN IN");
+                pinMode(PIN_VEN, INPUT);
                 break;
             case ' ':
                 changeOutput(0, 1-bitRead(output, 0));    
