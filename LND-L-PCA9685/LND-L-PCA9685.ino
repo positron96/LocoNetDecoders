@@ -76,18 +76,34 @@ void setup() {
     for(int i=0; i<ADDR_IN_COUNT; i++) {
         pinMode(PIN_IN[i], INPUT_PULLUP_EN ? INPUT_PULLUP : INPUT);
     }
+
+    pinMode(PIN_OEn, OUTPUT);
+    digitalWrite(PIN_OEn, HIGH); // disable pca
     
+    Wire.begin();
+    pwm.softResetAll();
     pwm.begin();
-    pwm.setPWMFreq(1600);
-    pwm.setOpenDrainOutput();
+    //pwm.setPWMFreq(1600);
+    //pwm.write8(  PCA9685_MODE1, pwm.read8(PCA9685_MODE1) | MODE1_AI  );
+    
     sendOutput(PCA9685_ALL_LEDS, 0);
+    pwm.setOpenDrainOutput();
+    pwm.setInvertMode(true);
+    pwm.setOeMode(PCA9685Driver::OeMode::HIGHZ);
+    //pwm.begin();
+
+    pwm.wakeup();    
+    
+    //Serial.println( pwm.read8(PCA9685_MODE1), BIN );
+    //Serial.println( pwm.read8(PCA9685_MODE2), BIN );
+    
     for(int i=0; i<CH_OUT_COUNT; i++) {
         maxOutputVals[i] = 1024;
     }
     //maxOutputVals[1] = 128;
 
     digitalWrite(PIN_VEN, LOW); // enable LED driver
-    
+    digitalWrite(PIN_OEn, LOW); // enable pca
     
     LocoNet.init(PIN_TX);  
 
@@ -125,7 +141,7 @@ constexpr uint32_t TRANS_TIME = 100; // ms
 constexpr uint8_t RES = 8;
 
 static inline void sendOutput(uint8_t ch, uint16_t val) {
-    pwm.setPWM(ch, val, true);
+    pwm.setPWM(ch, val);
 }
 
 void changeOutput(uint8_t ch, uint8_t val) {
@@ -305,24 +321,35 @@ void loop() {
     if (Serial.available()>0) {
         int t = Serial.read();
         switch(t) {
-            case 'H':
+            case 'h':
                 Serial.println("OE HIGH");
                 digitalWrite(PIN_OEn, HIGH); // disable LED driver    
                 break;
-            case 'L':
+            case 'l':
                 Serial.println("OE LOW");
                 digitalWrite(PIN_OEn, LOW);     
                 break;
-            case 'O':
+            case 'o':
                 Serial.println("OE OUT");
                 pinMode(PIN_OEn, OUTPUT);
                 break;
-            case 'I':
+            case 'i':
                 Serial.println("OE IN");
                 pinMode(PIN_OEn, INPUT);
                 break;
+            case 'r':
+                break;
+            case 'e':
+                Serial<<="setting restart flag";
+                pwm.restart();
+                break;
+            case 'z':  Serial<<="HighZ mode";  pwm.setOeMode(PCA9685Driver::OeMode::HIGHZ);  break;
+            case 'w':  Serial<<="Wakeup";  pwm.wakeup();   break;
+            case 'd':  Serial<<="Opendrain";  pwm.setOpenDrainOutput();   break;
+            case 'R':  Serial<<="softreset";  pwm.softResetAll();   break;
 
 
+/*
             case 'h':
                 Serial.println("VEN HIGH");
                 digitalWrite(PIN_VEN, HIGH); // disable 5Vo    
@@ -338,7 +365,7 @@ void loop() {
             case 'i':
                 Serial.println("VEN IN");
                 pinMode(PIN_VEN, INPUT);
-                break;
+                break;*/
             case ' ':
                 changeOutput(0, 1-bitRead(output, 0));    
                 break;
