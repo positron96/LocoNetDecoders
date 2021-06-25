@@ -1,9 +1,6 @@
 #include <LocoNet.h>
 
-template<class T> inline Print &operator <<(Print &obj, T arg) { obj.print(arg); return obj; }
-template<class T> inline Print &operator <<=(Print &obj, T arg) { obj.println(arg); return obj; }
-
-//#include <etl/Embedded_Template_Library.h>
+#include "SerialUtils.h"
 #include "MastManager.h"
 #include "PCA9685Driver.h"
 
@@ -22,22 +19,10 @@ constexpr int ADDR_IN_COUNT = 8;
 constexpr bool INPUT_PULLUP_EN = true;
 constexpr int PIN_IN[ADDR_IN_COUNT] = {11, 12, A0, A1, A2, A3, 7, 6};
 
-LocoNetSystemVariableClass sv;
-
-constexpr uint16_t SV_ADDR_FADING = SV_ADDR_USER_BASE;
-constexpr uint16_t SV_ADDR_RESET = 255;//SV_ADDR_USER_BASE + 250;
-
-constexpr uint16_t DEFAULT_ADDR = 10;
-constexpr uint16_t DEFAULT_SERIAL = 0x0001;
-constexpr uint8_t ID_MANFR = 13; // DIY
-constexpr uint8_t ID_DEVLPR = 4;  
-constexpr uint8_t ID_PRODUCT = 2;
-constexpr uint8_t ID_SWVER = 1;
-
 using PCADriver = PCA9685Driver<PIN_OE>;
-MastManager<16, PCADriver> masts;
+using TMastManager = MastManager<PCADriver::CH_OUT_COUNT/2, PCADriver>;
+TMastManager masts;
 
-bool fade;
 
 uint16_t startInAddr;
 
@@ -54,13 +39,15 @@ constexpr int LED_INTL_NORMAL = 1000;
 constexpr int LED_INTL_CONFIG1 = 400;
 constexpr int LED_INTL_CONFIG2 = 150;
 
+uint8_t EEPROM_VER = PCADriver::EEPROM_VER + TMastManager::EEPROM_VER;
+
 void ledFire(uint32_t, uint8_t);
 void ledStop();
 //static void sendOutput(uint8_t ch, uint16_t val);
 
 void setup() {
     Serial.begin(115200);
-    Serial.println(F("LND-16L8I - LocoNet accessory decoder with 16 LEDs and 8 inputs"));
+    Serial.println(F("LND-L - LocoNet accessory decoder with 16 LEDs and 8 inputs"));
     
     pinMode(PIN_BT, INPUT);
     
@@ -73,32 +60,33 @@ void setup() {
 
     PCADriver::init();
 
-    masts.addMast(11, 1, 2);    
-    masts.addMast(10, 0, 1);
-    
+    static_assert( 1 + PCADriver::EEPROM_REQUIRED + TMastManager::EEPROM_REQUIRED < E2END, "EEPROM size exceeded");
+    uint8_t ver = EEPROM.read(0);
+    int addr = 1;
+    if(ver == EEPROM_VER) {
+        PCADriver::load(addr);
+        masts.load(addr);
+    } else {
+        Serial<<=F("Bad EEPROM, using default values");
+        PCADriver::reset();
+        //PCADriver::save(addr);
+
+        masts.reset();
+        masts.addMast(10, 1);
+        //masts.save(addr);
+    }    
     
     LocoNet.init(PIN_TX);  
 
-    sv.init(ID_MANFR, ID_DEVLPR, ID_PRODUCT, ID_SWVER);
-    uint16_t serial = 
-          sv.readSVStorage(SV_ADDR_SERIAL_NUMBER_H)<<8 
-        | sv.readSVStorage(SV_ADDR_SERIAL_NUMBER_L);
-
-    if(serial != DEFAULT_SERIAL) {  
-        Serial.println(F("Writing factory defaults") );
-        sv.writeSVStorage(SV_ADDR_SERIAL_NUMBER_H, DEFAULT_SERIAL>>8);
-        sv.writeSVStorage(SV_ADDR_SERIAL_NUMBER_L, DEFAULT_SERIAL & 0xFF);
-        sv.writeSVNodeId(DEFAULT_ADDR);
-    }
-
     //startOutAddr = sv.readSVNodeId(); 
     startInAddr = 10;
-    fade = sv.readSVStorage(SV_ADDR_FADING) != 0;
     
-    //Serial<< F("Output start address is ") <<= startOutAddr;
     Serial<< F("Input start address is ") <<= startInAddr;
-    Serial<< F("Fade is ") <<= fade?"On":"Off";
-
+    int i=0; 
+    for(const auto &m: masts) {
+        Serial<<F("Mast ")<<i<<F("; address=")<<m.busAddr()<<F("; output=")<<=m.ch;
+        i++;
+    }
     Serial<<= F("Init done");
 }
 
@@ -155,7 +143,7 @@ void checkButton() {
     if(bt==1 && lastBt==0) {
         //Serial.println("Button down");
         btPressTime = millis();
-        if(configMode) Serial.println("Quitting config mode");
+        if(configMode) Serial<<=F("Quitting config mode");
         configMode=false;
         delay(5); // simple debounce
         ledStop();
@@ -164,7 +152,7 @@ void checkButton() {
         if(millis()-btPressTime>BUTTON_LONG_PRESS_DURATION && !configMode) { 
             configMode=true;
             configVar=0;
-            Serial.println("Entering config mode");
+            Serial<<=F("Entering config mode");
             ledOn(); // start blink again
         }
     }
@@ -214,7 +202,7 @@ void checkInputs() {
 void processImmPacket(sendPktMsg &m) {
     if(m.val7f != 0x7F) return;
     uint8_t len = (m.reps & 0b01110000)>> 4;
-    Serial<<"Imm packet of len "<<=len;
+    //Serial<<F("Imm packet of len ")<<=len;
     if(len!=3) return;
     uint8_t d[3] = { m.im1, m.im2, m.im3 };
     for(uint8_t i=0; i<3; i++) {
@@ -225,10 +213,10 @@ void processImmPacket(sendPktMsg &m) {
                   | ( d[1] & 0b110)>>1  // low
                   | (~d[1] & 0b01110000)<<(8-4) // high
                   ) + 1;
-    Serial<<"Imm address = "<<=addr;
+    Serial<<F("Imm address = ")<<=addr;
     //if(addr>=startOutAddr && addr<=startOutAddr+ADDR_OUT_COUNT) {
         uint8_t aspect = d[2]; 
-        Serial<<"aspect="<<=aspect;
+        Serial<<F("aspect=")<<=aspect;
         ledFire(100);
         int16_t idx = masts.findAddr(addr);
         if(idx>=0)
@@ -241,25 +229,16 @@ void processImmPacket(sendPktMsg &m) {
 }
 
 void loop() {
-    static bool deferredProcessingNeeded = false;
 
     lnMsg *msg = LocoNet.receive() ;
     if ( msg!=nullptr ) {
 
         if(msg->data[0] == OPC_IMM_PACKET) {
             processImmPacket(msg->sp);
-                        
-        } else
-        if (!LocoNet.processSwitchSensorMessage(msg)) {
-            SV_STATUS svStatus = sv.processMessage(msg);
-            Serial<<F("LNSV processMessage - Status: ")<<=svStatus;
-            deferredProcessingNeeded = (svStatus == SV_DEFERRED_PROCESSING_NEEDED);
+        } else if (!LocoNet.processSwitchSensorMessage(msg)) {
         } else {
         }
     }
-
-    if(deferredProcessingNeeded)
-        deferredProcessingNeeded = (sv.doDeferredProcessing() != SV_OK);
 
     checkButton();
 
@@ -416,20 +395,3 @@ void reportChannelState(uint8_t ch) {
 }
 */
 
-
-void notifySVChanged(uint16_t offs){
-    Serial.print("notifySVChanged: SV");
-    Serial.print(offs);
-    Serial.print("->");
-    Serial.println(sv.readSVStorage(offs));
-    switch(offs) {
-        case SV_ADDR_RESET: 
-            // this will factory reset on reset
-            sv.writeSVStorage(SV_ADDR_SERIAL_NUMBER_H, 10); 
-            sv.writeSVStorage(SV_ADDR_RESET, 0); 
-            break;
-        case SV_ADDR_FADING:
-            fade = sv.readSVStorage(SV_ADDR_FADING)!=0;
-            break;   
-    }
-}

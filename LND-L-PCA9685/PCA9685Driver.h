@@ -5,40 +5,67 @@
 #undef min
 #undef max
 #include <etl/bitset.h>
+#include "SerialUtils.h"
+#include <EEPROM.h>
 
 template<uint8_t PIN_OE>
 class PCA9685Driver {
 public:
-    constexpr static int CH_OUT_COUNT = 16;
+    using out_t = uint8_t;
+    constexpr static out_t CH_OUT_COUNT = 16;
     static Adafruit_PWMServoDriver pwm;
-    static uint8_t maxOutputVals[CH_OUT_COUNT]; ///< divided by 16 (actual max is 12bits)    
+    static uint8_t maxPWM[CH_OUT_COUNT]; ///< divided by 16 (actual max is 12bits) 
 
     static void init() {
         pwm = Adafruit_PWMServoDriver(0x40);
 
         pinMode(PIN_OE, OUTPUT);
-        digitalWrite(PIN_OE, HIGH); // disable LED driver   
+        digitalWrite(PIN_OE, HIGH); // disable LED driver 
         pwm.begin();
         pwm.setPWMFreq(1600);
         pwm.setOutputMode(false); // open drain
         for(int ch=0; ch<CH_OUT_COUNT; ch++) {
             pwm.setPin(ch, 0, true);
-            curVal[ch] = false;
-            maxOutputVals[ch] = 32;
-            fade[ch] = true;
         }
-        maxOutputVals[0] = 8;
+        //maxOutputVals[0] = 8;
         digitalWrite(PIN_OE, LOW); // enable LED driver
     }
 
-    static void set(uint16_t ch, bool val) {
+    static constexpr uint8_t EEPROM_VER = 1;
+    static constexpr int EEPROM_REQUIRED = CH_OUT_COUNT*2;
+    static bool load(int &eepromAddr) {
+        for(out_t i=0; i<CH_OUT_COUNT; i++) {
+            EEPROM.get<uint8_t>(eepromAddr, maxPWM[i]);
+            uint8_t f;
+            EEPROM.get<uint8_t>(eepromAddr+1, f);
+            fade[i] = f!=0;
+            eepromAddr+=2;
+        }
+        return true;
+    }
+    static void reset() {
+        for(out_t ch=0; ch<CH_OUT_COUNT; ch++) {
+            maxPWM[ch] = 32;
+            fade[ch] = true;
+        }
+    }
+    static bool save(int &eepromAddr) {
+        for(out_t i=0; i<CH_OUT_COUNT; i++) {
+            EEPROM.put<uint8_t>(eepromAddr, maxPWM[i]);
+            EEPROM.put<uint8_t>(eepromAddr+1, fade[i] ? 255 : 0);
+            eepromAddr+=2;
+        }
+        return true;
+    }
+
+    static void set(out_t ch, bool val) {
         if(get(ch)==val) return;
 
         //Serial<<F("Setting channel ")<<ch<<F(" to ")<<=val;
 
-        int16_t dst = val ? (maxOutputVals[ch]<<4) : 0;
+        int16_t dst = val ? (maxPWM[ch]<<4) : 0;
         if(fade[ch]) {
-            int16_t src = (!val)?(maxOutputVals[ch]<<4) : 0;
+            int16_t src = (!val)?(maxPWM[ch]<<4) : 0;
             for(uint8_t i=0; i<RES; i++) {
                 uint16_t t = src + (dst-src)*i/RES;
                 pwm.setPin(ch, t, true);
@@ -49,15 +76,15 @@ public:
         curVal[ch] = val;
     }
 
-    static void set2(uint16_t ch0, bool val, uint8_t ofs1, uint8_t ofs2) {
-        uint16_t ch1=ch0+ofs1, ch2=ch0+ofs2;
+    static void set2(out_t ch0, bool val, uint8_t ofs1, uint8_t ofs2) {
+        out_t ch1=ch0+ofs1, ch2=ch0+ofs2;
         if(get(ch1)==val && get(ch2)==val) return;
 
-        int16_t dst1 = val ? (maxOutputVals[ch1]<<4) : 0;
-        int16_t dst2 = val ? (maxOutputVals[ch2]<<4) : 0;
+        int16_t dst1 = val ? (maxPWM[ch1]<<4) : 0;
+        int16_t dst2 = val ? (maxPWM[ch2]<<4) : 0;
         if(fade[ch0+ofs1]) {
-            int16_t src1 = get(ch1)?(maxOutputVals[ch1]<<4) : 0;
-            int16_t src2 = get(ch2)?(maxOutputVals[ch2]<<4) : 0;
+            int16_t src1 = get(ch1)?(maxPWM[ch1]<<4) : 0;
+            int16_t src2 = get(ch2)?(maxPWM[ch2]<<4) : 0;
             for(uint8_t i=0; i<RES; i++) {
                 uint16_t t1 = src1 + (dst1-src1)*i/RES;
                 uint16_t t2 = src2 + (dst2-src2)*i/RES;
@@ -72,11 +99,11 @@ public:
         curVal[ch2] = val;
     }
 
-    static bool get(uint16_t pin) {
+    static bool get(out_t pin) {
         return curVal[pin];
     }
 
-    static void toggle(uint16_t pin) {
+    static void toggle(out_t pin) {
         set(pin, !get(pin)); 
     }
 
@@ -93,7 +120,7 @@ template<uint8_t OE>
 Adafruit_PWMServoDriver PCA9685Driver<OE>::pwm;
 
 template<uint8_t OE>
-uint8_t PCA9685Driver<OE>::maxOutputVals[PCA9685Driver<OE>::CH_OUT_COUNT];
+uint8_t PCA9685Driver<OE>::maxPWM[PCA9685Driver<OE>::CH_OUT_COUNT];
 
 template<uint8_t OE>
 etl::bitset<PCA9685Driver<OE>::CH_OUT_COUNT> PCA9685Driver<OE>::fade;
