@@ -26,7 +26,7 @@ public:
         uint8_t nheads:3;
     };
 
-    using ch_t = typename OutputDriver::out_t;
+    using ch_t = typename OutputDriver::channel_t;
     info_t info;
     ch_t ch;
     uint8_t curAspect;

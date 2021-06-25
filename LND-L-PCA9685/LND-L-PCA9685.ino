@@ -2,7 +2,7 @@
 
 #include "SerialUtils.h"
 #include "MastManager.h"
-#include "PCA9685Driver.h"
+#include "PCA9685GPIO.h"
 
 
 constexpr int PIN_OE = 3;
@@ -19,7 +19,7 @@ constexpr int ADDR_IN_COUNT = 8;
 constexpr bool INPUT_PULLUP_EN = true;
 constexpr int PIN_IN[ADDR_IN_COUNT] = {11, 12, A0, A1, A2, A3, 7, 6};
 
-using PCADriver = PCA9685Driver<PIN_OE>;
+using PCADriver = PCA9685GPIO<PIN_OE>;
 using TMastManager = MastManager<PCADriver::CH_OUT_COUNT/2, PCADriver>;
 TMastManager masts;
 
