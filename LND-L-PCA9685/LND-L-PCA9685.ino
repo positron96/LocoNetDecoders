@@ -70,6 +70,7 @@ void setup() {
         masts.load(addr);
     } else {
         Serial<<=F("Bad EEPROM, using default values");
+        EEPROM.put<uint8_t>(0, EEPROM_VER);
         PCADriver::reset();
         //PCADriver::save(addr);
 
@@ -100,31 +101,6 @@ int hex2int(char ch) {
     if (ch >= 'a' && ch <= 'f') return ch - 'a' + 10;
     return -1;
 }
-
-// static inline void sendOutput(uint8_t ch, uint16_t val) {
-//     pwm.setPin(ch, val, true);
-// }
-
-/*
-void changeOutput(uint8_t ch, uint8_t val) {
-    if(bitRead(output, ch)==val)  return;
-
-    Serial<<F("Setting channel ")<<ch<<F(" to ")<<=val;
-
-    int16_t dst = val * maxOutputVals[ch];
-    if(fade) {
-        int16_t src = (dst==0)?maxOutputVals[ch] : 0;
-        //Serial.println(String("src=")+src+"; dst="+dst);
-        for(uint8_t i=0; i<RES; i++) {
-            uint16_t t = src + (dst-src)*i/RES;
-            sendOutput(ch, t);
-            delay(TRANS_TIME/RES);
-        }
-    }
-    bitWrite(output, ch, val);
-    sendOutput(ch, dst);
-    reportChannelState(ch);
-}*/
 
 void ledFire(uint32_t ms, uint8_t val=1) {
     ledVal = val;
@@ -218,18 +194,13 @@ void processImmPacket(sendPktMsg &m) {
                   | (~d[1] & 0b01110000)<<(8-4) // high
                   ) + 1;
     Serial<<F("Imm address = ")<<=addr;
-    //if(addr>=startOutAddr && addr<=startOutAddr+ADDR_OUT_COUNT) {
-        uint8_t aspect = d[2]; 
-        Serial<<F("aspect=")<<=aspect;
-        ledFire(100);
-        int16_t idx = masts.findAddr(addr);
-        if(idx>=0)
-            masts.setAspect(idx, aspect);
+    uint8_t aspect = d[2]; 
+    Serial<<F("aspect=")<<=aspect;
+    ledFire(100);
+    int16_t idx = masts.findAddr(addr);
+    if(idx>=0)
+        masts.setAspect(idx, aspect);
 
-        //uint8_t ch = (addr-startOutAddr)*4 + aspect; 
-        //uint8_t val = 1;
-        //changeOutput(ch, val);    
-    //}
 }
 
 void loop() {
@@ -312,33 +283,6 @@ void loop() {
         
     }
 
-    /*
-     
-    static long nextUpdate = millis();
-    if(millis()> nextUpdate ) {
-        for(int i=0; i<16; i++) {
-            if(h2[i]<led_pwm[i]) {
-                bitSet(output, i);
-                h2[i] += P-led_pwm[i];
-            } else {
-                bitClear(output, i);
-                h2[i] -= led_pwm[i];
-            }
-        }
-        //Serial.println(String("i=0")+" pwm="+led_pwm[0]+" h2="+h2[0]);
-        digitalWrite(PIN_LE, LOW);
-        SPI.transfer16( output ); 
-        digitalWrite(PIN_LE, HIGH);
-        nextUpdate = millis()+1;
-    }
-    */
-    /*for (int channel = 0; channel < 16; channel++) {
-        digitalWrite(PIN_LE, LOW);
-        SPI.transfer16( (uint16_t) (1 << channel) ); 
-        digitalWrite(PIN_LE, HIGH);
-        delay(250);
-        Serial.println( (uint16_t)1<<channel, BIN);
-    }*/
 
 }
 
