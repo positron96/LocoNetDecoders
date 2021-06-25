@@ -4,8 +4,8 @@
 #include "MastManager.h"
 #include "PCA9685GPIO.h"
 
-
-constexpr int PIN_OE = 3;
+constexpr int PIN_OE = 4;
+constexpr int PIN_VEN = 3;
 
 constexpr int PIN_LED = 10;
 constexpr int PIN_BT = 2;
@@ -58,6 +58,8 @@ void setup() {
         pinMode(PIN_IN[i], INPUT_PULLUP_EN ? INPUT_PULLUP : INPUT);
     }
 
+    pinMode(PIN_VEN, OUTPUT);
+    digitalWrite(PIN_VEN, HIGH); // disable 5Vo
     PCADriver::init();
 
     static_assert( 1 + PCADriver::EEPROM_REQUIRED + TMastManager::EEPROM_REQUIRED < E2END, "EEPROM size exceeded");
@@ -72,9 +74,11 @@ void setup() {
         //PCADriver::save(addr);
 
         masts.reset();
-        masts.addMast(10, 1);
+        masts.addMast(10, 3);
         //masts.save(addr);
-    }    
+    } 
+
+    digitalWrite(PIN_VEN, LOW); // enable 5Vo
     
     LocoNet.init(PIN_TX);  
 
