@@ -64,21 +64,13 @@ public:
     }
 
     void setAspect(uint8_t aspect) {
+        if(curAspect==aspect) return;
         curAspect = aspect;
         lastChangeTime = 0;
         switch(nheads() ) {
-            case 1: { // 1-head
-                set1head();
-                break;
-            }
-            case 2: { // 2-head
-                set2head();
-                break;
-            }
-            case 3: { // 3-head
-                set3head();
-                break;
-            }
+            case 1: set1head(); break;
+            case 2: set2head(); break;
+            case 3: set3head(); break;
         }
     }
 
@@ -87,18 +79,17 @@ public:
     void tick() {
         if(lastChangeTime==0) return;
         switch(nheads() ) {
-            case 1: { // 1-head
-                tick1head();
-                break;
-            }
-            case 2: { // 2-head
-                tick2head();
-                break;
-            }
-            case 3: { // 3-head
-                tick3head();
-                break;
-            }
+            case 1: tick1head(); break;
+            case 2: tick2head(); break;
+            case 3: tick3head(); break;
+        }
+    }
+
+    uint8_t getAspectCount() {
+        switch(nheads()) {
+            case 1: return 3;
+            case 2: return 5;
+            case 3: return 10;
         }
     }
 
@@ -228,10 +219,6 @@ private:
         }
     }
 
-    /*using fn = etl::add_pointer( void(Mast&) )::type;
-    static fn tickFns[];
-    static fn setFns[];*/
-
 };
 
 using mast_idx_t = uint8_t;
@@ -272,23 +259,31 @@ public:
         return true;
     }
 
+    void deleteLastMast() {
+        if(masts.size()>0) masts.pop_back();
+    }
+
     void clear() {
         masts.clear();
     }
 
     typename MastsVector::const_iterator begin() const { return masts.cbegin(); }
     typename MastsVector::const_iterator end() const { return masts.cend(); }
+    typename MastsVector::iterator begin() { return masts.begin(); }
+    typename MastsVector::iterator end() { return masts.end(); }
 
 
     static constexpr uint8_t EEPROM_VER = 1;
     static constexpr int EEPROM_REQUIRED = mast_idx_t_size + MAX_MASTS*TMast::EEPROM_REQUIRED;
 
-    bool load(int &eepromAddr) {
+    bool load(int eepromAddr) {
+        clear();
+
         mast_idx_t count;
         EEPROM.get<mast_idx_t>(eepromAddr, count);
+        if(count>MAX_MASTS) return false;
         eepromAddr += mast_idx_t_size;
         ch_t ch=0;
-        clear();
         for(mast_idx_t i=0; i<count; i++) {
             TMast t{eepromAddr, ch};
             masts.push_back( t );
@@ -300,7 +295,7 @@ public:
         clear();
     }
 
-    bool save(int &eepromAddr) {
+    bool save(int eepromAddr) {
         EEPROM.put<mast_idx_t>(eepromAddr, masts.size() );
         eepromAddr += mast_idx_t_size;
         for(const auto &m: masts) {

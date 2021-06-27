@@ -3,6 +3,7 @@
 #include "SerialUtils.h"
 #include "MastManager.h"
 #include "PCA9685GPIO.h"
+#include "SerialReader.h"
 
 constexpr int PIN_OE = 4;
 constexpr int PIN_VEN = 3;
@@ -39,7 +40,10 @@ constexpr int LED_INTL_NORMAL = 1000;
 constexpr int LED_INTL_CONFIG1 = 400;
 constexpr int LED_INTL_CONFIG2 = 150;
 
-uint8_t EEPROM_VER = PCADriver::EEPROM_VER + TMastManager::EEPROM_VER;
+constexpr uint8_t EEPROM_VER = PCADriver::EEPROM_VER ^ TMastManager::EEPROM_VER;
+constexpr int EEPROM_HEADER_SIZE = 1;
+constexpr int EEPROM_OUTPUTS_START = EEPROM_HEADER_SIZE;
+constexpr int EEPROM_MASTS_START = EEPROM_OUTPUTS_START + PCADriver::EEPROM_REQUIRED;
 
 void ledFire(uint32_t, uint8_t);
 void ledStop();
@@ -60,26 +64,22 @@ void setup() {
 
     pinMode(PIN_VEN, OUTPUT);
     digitalWrite(PIN_VEN, HIGH); // disable 5Vo
-    PCADriver::init();
+    PCADriver::initHw();
+    digitalWrite(PIN_VEN, LOW); // enable 5Vo
 
-    static_assert( 1 + PCADriver::EEPROM_REQUIRED + TMastManager::EEPROM_REQUIRED < E2END, "EEPROM size exceeded");
+    static_assert( EEPROM_HEADER_SIZE + PCADriver::EEPROM_REQUIRED + TMastManager::EEPROM_REQUIRED < E2END, "EEPROM size exceeded");
     uint8_t ver = EEPROM.read(0);
-    int addr = 1;
     if(ver == EEPROM_VER) {
-        PCADriver::load(addr);
-        masts.load(addr);
+        PCADriver::load(EEPROM_OUTPUTS_START);
+        masts.load(EEPROM_MASTS_START);
     } else {
-        Serial<<=F("Bad EEPROM, using default values");
-        EEPROM.put<uint8_t>(0, EEPROM_VER);
+        Serial<<=F("Bad EEPROM, loading default values");
         PCADriver::reset();
-        //PCADriver::save(addr);
-
         masts.reset();
-        masts.addMast(10, 3);
-        //masts.save(addr);
+        save();
     } 
 
-    digitalWrite(PIN_VEN, LOW); // enable 5Vo
+    
     
     LocoNet.init(PIN_TX);  
 
@@ -95,7 +95,13 @@ void setup() {
     Serial<<= F("Init done");
 }
 
-int hex2int(char ch) {
+void save() {
+    EEPROM.put<uint8_t>(0, EEPROM_VER);
+    PCADriver::save(EEPROM_OUTPUTS_START);
+    masts.save(EEPROM_MASTS_START);
+}
+
+int hex2int(const char ch) {
     if (ch >= '0' && ch <= '9') return ch - '0';
     if (ch >= 'A' && ch <= 'F') return ch - 'A' + 10;
     if (ch >= 'a' && ch <= 'f') return ch - 'a' + 10;
@@ -246,11 +252,62 @@ void loop() {
     }
     */
 
-    
-    if (Serial.available()>0) {
-        int t = Serial.read();
-        switch(t) {
+    static SerialReader ser;
+    static mast_idx_t cmast=0;
 
+    if(ser.checkSerial(Serial)) {
+        char* cmd = ser.bufPart(0);
+        if(strcmp(cmd, "mast")==0) {
+            cmast = atoi(ser.bufPart(1));
+            Serial<<F("Current mast idx ")<<=cmast;
+        } else 
+        if(strlen(cmd)==1) {
+            int aspect = hex2int(cmd[0]);
+            Serial<<F("Setting mast ")<<cmast<<':'<<=aspect;
+            masts.setAspect(cmast, aspect);
+        } else if(strcmp(cmd, "addmast")==0) {
+            int addr = atoi(ser.bufPart(1));
+            int nh = atoi(ser.bufPart(2));
+            Serial<<F("Adding mast addr=")<<addr<<F("; heads=")<<=nh;
+            masts.addMast(addr, nh);
+        } else
+        if(strcmp(cmd, "delmast")) {
+            Serial<<=F("Deleted last mast");
+            masts.deleteLastMast();
+        } else
+        if(strcmp(cmd, "br")==0) {
+            PCADriver::channel_t ch = atoi(ser.bufPart(1));
+            uint16_t mx = atoi(ser.bufPart(2));
+            Serial<<F("Setting max PWM for channel ")<<ch<<':'<<=mx;
+            PCADriver::setMaxPWM( ch, mx );
+        } else
+        if(strcmp(cmd, "reset")==0) {
+            Serial<<=F("Loading defaults");
+            PCADriver::reset();
+            masts.reset();
+        } else 
+        if(strcmp(cmd, "save")==0) {
+            Serial<<=F("Saving to EEPROM");
+            save();
+        } else
+
+        if(strcmp(cmd, "off")==0) {
+            Serial<<=F("All masts off");
+            for(auto& m: masts) {
+                m.setAspect(0);
+            }
+        } else 
+        if(strcmp(cmd, "ch")==0)  {
+            int ch = atoi(ser.bufPart(1));
+            int v = atoi(ser.bufPart(2));
+            Serial<<F("Setting ch ")<<ch<<F(" to ")<<=v;
+            PCADriver::set(ch, v!=0);
+        }
+
+    }
+
+
+/*
             case 'h':
                 Serial.println("HIGH");
                 digitalWrite(PIN_OE, HIGH); // disable LED driver    
@@ -283,7 +340,7 @@ void loop() {
         
     }
 
-
+*/
 }
 
 

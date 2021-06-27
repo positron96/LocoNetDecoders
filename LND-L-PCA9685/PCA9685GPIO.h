@@ -16,7 +16,7 @@ public:
     static PCA9685Driver pwm;
     static uint8_t maxPWM[CH_OUT_COUNT]; ///< divided by 16 (actual max is 12bits) 
 
-    static void init() {
+    static void initHw() {
         pwm = PCA9685Driver(0x40);
         
         pinMode(PIN_OEn, OUTPUT);
@@ -25,13 +25,12 @@ public:
         Wire.begin();
         pwm.softResetAll();
         pwm.begin();
-        //pwm.setPWMFreq(1600);
-        //pwm.write8(  PCA9685_MODE1, pwm.read8(PCA9685_MODE1) | MODE1_AI  );
-        
+
         pwm.setPWM(PCA9685_ALL_LEDS, 0);
         pwm.setOpenDrainOutput();
         pwm.setInvertMode(true);
         pwm.setOeMode(PCA9685Driver::OeMode::HIGHZ);
+        pwm.setPWMFreq(1600);
 
         pwm.wakeup();    
         
@@ -39,9 +38,9 @@ public:
     
     }
 
-    static constexpr uint8_t EEPROM_VER = 1;
+    static constexpr uint8_t EEPROM_VER = 1+CH_OUT_COUNT;
     static constexpr int EEPROM_REQUIRED = CH_OUT_COUNT*2;
-    static bool load(int &eepromAddr) {
+    static bool load(int eepromAddr) {
         for(channel_t i=0; i<CH_OUT_COUNT; i++) {
             EEPROM.get<uint8_t>(eepromAddr, maxPWM[i]);
             uint8_t f;
@@ -57,7 +56,7 @@ public:
             fade[ch] = true;
         }
     }
-    static bool save(int &eepromAddr) {
+    static bool save(int eepromAddr) {
         for(channel_t i=0; i<CH_OUT_COUNT; i++) {
             EEPROM.put<uint8_t>(eepromAddr, maxPWM[i]);
             EEPROM.put<uint8_t>(eepromAddr+1, fade[i] ? 255 : 0);
@@ -71,9 +70,9 @@ public:
 
         //Serial<<F("Setting channel ")<<ch<<F(" to ")<<=val;
 
-        int16_t dst = val ? (maxPWM[ch]<<4) : 0;
+        int16_t dst = val ? maxPWM12(ch) : 0;
         if(fade[ch]) {
-            int16_t src = (!val)?(maxPWM[ch]<<4) : 0;
+            int16_t src = (!val)?maxPWM12(ch) : 0;
             for(uint8_t i=0; i<RES; i++) {
                 uint16_t t = src + (dst-src)*i/RES;
                 pwm.setPWM(ch, t);
@@ -88,11 +87,11 @@ public:
         channel_t ch1=ch0+ofs1, ch2=ch0+ofs2;
         if(get(ch1)==val && get(ch2)==val) return;
 
-        int16_t dst1 = val ? (maxPWM[ch1]<<4) : 0;
-        int16_t dst2 = val ? (maxPWM[ch2]<<4) : 0;
+        int16_t dst1 = val ? maxPWM12(ch1) : 0;
+        int16_t dst2 = val ? maxPWM12(ch2) : 0;
         if(fade[ch0+ofs1]) {
-            int16_t src1 = get(ch1)?(maxPWM[ch1]<<4) : 0;
-            int16_t src2 = get(ch2)?(maxPWM[ch2]<<4) : 0;
+            int16_t src1 = get(ch1) ? maxPWM12(ch1) : 0;
+            int16_t src2 = get(ch2) ? maxPWM12(ch2) : 0;
             for(uint8_t i=0; i<RES; i++) {
                 uint16_t t1 = src1 + (dst1-src1)*i/RES;
                 uint16_t t2 = src2 + (dst2-src2)*i/RES;
@@ -115,12 +114,23 @@ public:
         set(pin, !get(pin)); 
     }
 
+    static void setMaxPWM(channel_t ch, uint16_t max) {
+        maxPWM[ch] = max >> PWM_BITSHIFT;
+    }
+
 private:
     static etl::bitset<CH_OUT_COUNT> fade;
     static etl::bitset<CH_OUT_COUNT> curVal;
     
     static constexpr uint32_t TRANS_TIME = 100; // ms
     static constexpr uint8_t RES = 8;
+
+    static constexpr uint8_t PWM_BITS = 8;
+    static constexpr uint8_t PWM_BITSHIFT = 12-PWM_BITS;
+
+    static uint16_t maxPWM12(channel_t ch) {
+        return maxPWM[ch] << PWM_BITSHIFT;
+    }
 
 };
 
