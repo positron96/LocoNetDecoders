@@ -36,4 +36,27 @@ The board features:
 
 ## User manual
 
+### Aspect values
+
+* 1-head aspect
+** 0=off
+** 1=on
+** 2=blinking
+* 2-head aspect
+** 0 - all off
+** 1 - head 1 on
+** 2 - head 2 on
+** 3 - head 1 blink
+** 4 - alternating blink
+* 3-head aspect
+** 0 - all off
+** 1 - head 3 on
+** 2 - head 1 on
+** 3 - head 2 on
+** 4 - head 1 blink
+** 5 - head 2 blink
+** 6 - alternating heads 1 and 2 blink
+** 7 - head 3 blink
+** 8 - heads 1 and 3 on
+
 ### Configuration
