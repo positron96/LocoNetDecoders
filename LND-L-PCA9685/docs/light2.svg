@@ -17,9 +17,9 @@
    id="svg8"
    inkscape:version="0.92.3 (2405546, 2018-03-11)"
    sodipodi:docname="light2.svg"
-   inkscape:export-filename="/media/sf_DATA/Documents/PlatformIO/Projects/LocoNetDecoders/LND-L-PCA9685/docs/2-w(bl)-gr.png"
-   inkscape:export-xdpi="38.400002"
-   inkscape:export-ydpi="38.400002">
+   inkscape:export-filename="/media/sf_DATA/Documents/PlatformIO/Projects/LocoNetDecoders/LND-L-PCA9685/docs/2-g-y.png"
+   inkscape:export-xdpi="33.599998"
+   inkscape:export-ydpi="33.599998">
   <defs
      id="defs2" />
   <sodipodi:namedview
@@ -29,17 +29,17 @@
      borderopacity="1.0"
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
-     inkscape:zoom="3.959798"
-     inkscape:cx="15.482517"
-     inkscape:cy="43.596964"
+     inkscape:zoom="5.6"
+     inkscape:cx="25.362591"
+     inkscape:cy="44.374941"
      inkscape:document-units="px"
      inkscape:current-layer="layer1"
      showgrid="false"
      units="px"
-     inkscape:window-width="1485"
-     inkscape:window-height="928"
-     inkscape:window-x="137"
-     inkscape:window-y="62"
+     inkscape:window-width="1390"
+     inkscape:window-height="890"
+     inkscape:window-x="228"
+     inkscape:window-y="97"
      inkscape:window-maximized="0"
      showguides="true" />
   <metadata
@@ -50,7 +50,7 @@
         <dc:format>image/svg+xml</dc:format>
         <dc:type
            rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
-        <dc:title></dc:title>
+        <dc:title />
       </cc:Work>
     </rdf:RDF>
   </metadata>
@@ -60,7 +60,7 @@
      id="layer1"
      transform="translate(0,-275.83332)">
     <rect
-       style="display:inline;fill:#000000;stroke-width:0.23728205"
+       style="display:inline;fill:#000000;stroke-width:1.58749997;stroke:#fffffc;stroke-opacity:1;stroke-miterlimit:4;stroke-dasharray:none;paint-order:markers stroke fill"
        id="rect3742"
        width="10.441592"
        height="18.379093"
@@ -69,7 +69,7 @@
        ry="5.2207961"
        inkscape:label="back" />
     <circle
-       style="display:inline;fill:#808080;stroke-width:0.31169772"
+       style="display:inline;fill:#ffff00;stroke-width:0.31169772"
        id="path12"
        cx="6.5909657"
        cy="290.38541"
@@ -78,8 +78,9 @@
        inkscape:transform-center-y="0.065162537"
        inkscape:label="circle" />
     <g
-       id="g3721"
-       style="display:none"
+       transform="translate(-0.0146783,-0.04964813)"
+       id="g3721-1-9-3"
+       style="display:none;fill:#00ff00"
        inkscape:label="glow">
       <path
          inkscape:tile-y0="2.2577599"
@@ -90,44 +91,47 @@
          inkscape:tile-cx="6.6704485"
          inkscape:transform-center-y="-0.5576951"
          inkscape:transform-center-x="0.62888299"
-         sodipodi:nodetypes="accccccccccca"
+         sodipodi:nodetypes="scccccccccccs"
          inkscape:connector-curvature="0"
-         d="m 4.8248466,288.75298 c 0.1721899,-0.18461 0.6305726,-0.41947 0.6305726,-0.41947 l -0.7710975,-1.48992 0.2448377,1.1397 -0.5385125,-0.4972 0.1566559,0.51122 -0.5860767,-0.13232 0.1877709,0.56469 -0.5280705,-0.079 0.4988444,0.48147 -1.0893686,-0.18652 1.4156112,0.773 c 0,0 0.2046985,-0.47895 0.3788331,-0.66565 z"
-         style="fill:#ffffff;stroke:none;stroke-width:0.65782583;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
-         id="path43" />
+         d="m 4.8602819,288.74117 c 0.2432479,-0.23849 0.5951373,-0.40766 0.5951373,-0.40766 l -1.0073326,-2.15138 0.05585,1.26963 -0.5503243,-0.35546 0.2511499,0.65296 -0.5978885,-0.26224 0.2350179,0.60013 -0.6698115,-0.27981 0.3571033,0.68226 -1.2192979,-0.19832 2.1361283,1.12735 c 0,0 0.1596787,-0.42785 0.4142681,-0.67746 z"
+         style="fill:#00ff00;stroke:none;stroke-width:0.65782583;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+         id="path43-8-2-6" />
       <use
          transform="rotate(-90,6.6027854,290.41886)"
          height="100%"
          width="100%"
-         id="use4869"
+         id="use4869-7-2-7"
          inkscape:transform-center-y="0.62888514"
          inkscape:transform-center-x="0.55769719"
-         xlink:href="#path43"
+         xlink:href="#path43-8-2-6"
          y="0"
-         x="0" />
+         x="0"
+         style="fill:#00ff00" />
       <use
          transform="rotate(90,6.6021984,290.38866)"
          height="100%"
          width="100%"
-         id="use4871"
+         id="use4871-9-8-5"
          inkscape:transform-center-y="-0.62888335"
          inkscape:transform-center-x="-0.55769465"
-         xlink:href="#path43"
+         xlink:href="#path43-8-2-6"
          y="0"
-         x="0" />
+         x="0"
+         style="fill:#00ff00" />
       <use
          transform="rotate(180,6.558411,290.43448)"
          height="100%"
          width="100%"
-         id="use4873"
+         id="use4873-2-9-3"
          inkscape:transform-center-y="0.55770494"
          inkscape:transform-center-x="-0.62888306"
-         xlink:href="#path43"
+         xlink:href="#path43-8-2-6"
          y="0"
-         x="0" />
+         x="0"
+         style="fill:#00ff00" />
     </g>
     <circle
-       style="display:inline;fill:#ffffff;stroke-width:0.31169772"
+       style="display:inline;fill:#00ff00;stroke-width:0.31169772"
        id="path12-3"
        cx="6.5166025"
        cy="283.01099"
@@ -136,9 +140,9 @@
        inkscape:transform-center-y="0.065162537"
        inkscape:label="circle" />
     <g
-       transform="translate(-0.07436317,-7.3744388)"
-       id="g3721-6"
-       style="display:inline"
+       transform="translate(-0.08617317,-7.4098741)"
+       id="g3721-1-9"
+       style="display:none;fill:#00ff00;opacity:0.95000001"
        inkscape:label="glow">
       <path
          inkscape:tile-y0="2.2577599"
@@ -149,41 +153,44 @@
          inkscape:tile-cx="6.6704485"
          inkscape:transform-center-y="-0.5576951"
          inkscape:transform-center-x="0.62888299"
-         sodipodi:nodetypes="accccccccccca"
+         sodipodi:nodetypes="scccccccccccs"
          inkscape:connector-curvature="0"
-         d="m 4.8248466,288.75298 c 0.1721899,-0.18461 0.6305726,-0.41947 0.6305726,-0.41947 l -0.7710975,-1.48992 0.2448377,1.1397 -0.5385125,-0.4972 0.1566559,0.51122 -0.5860767,-0.13232 0.1877709,0.56469 -0.5280705,-0.079 0.4988444,0.48147 -1.0893686,-0.18652 1.4156112,0.773 c 0,0 0.2046985,-0.47895 0.3788331,-0.66565 z"
-         style="fill:#ffffff;stroke:none;stroke-width:0.65782583;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
-         id="path43-7" />
+         d="m 4.8602819,288.74117 c 0.2432479,-0.23849 0.5951373,-0.40766 0.5951373,-0.40766 l -1.0073326,-2.15138 0.05585,1.26963 -0.5503243,-0.35546 0.2511499,0.65296 -0.5978885,-0.26224 0.2350179,0.60013 -0.6698115,-0.27981 0.3571033,0.68226 -1.2192979,-0.19832 2.1361283,1.12735 c 0,0 0.1596787,-0.42785 0.4142681,-0.67746 z"
+         style="fill:#00ff00;stroke:none;stroke-width:0.65782583;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+         id="path43-8-2" />
       <use
          transform="rotate(-90,6.6027854,290.41886)"
          height="100%"
          width="100%"
-         id="use4869-5"
+         id="use4869-7-2"
          inkscape:transform-center-y="0.62888514"
          inkscape:transform-center-x="0.55769719"
-         xlink:href="#path43-7"
+         xlink:href="#path43-8-2"
          y="0"
-         x="0" />
+         x="0"
+         style="fill:#00ff00" />
       <use
          transform="rotate(90,6.6021984,290.38866)"
          height="100%"
          width="100%"
-         id="use4871-3"
+         id="use4871-9-8"
          inkscape:transform-center-y="-0.62888335"
          inkscape:transform-center-x="-0.55769465"
-         xlink:href="#path43-7"
+         xlink:href="#path43-8-2"
          y="0"
-         x="0" />
+         x="0"
+         style="fill:#00ff00" />
       <use
          transform="rotate(180,6.558411,290.43448)"
          height="100%"
          width="100%"
-         id="use4873-5"
+         id="use4873-2-9"
          inkscape:transform-center-y="0.55770494"
          inkscape:transform-center-x="-0.62888306"
-         xlink:href="#path43-7"
+         xlink:href="#path43-8-2"
          y="0"
-         x="0" />
+         x="0"
+         style="fill:#00ff00" />
     </g>
   </g>
 </svg>
