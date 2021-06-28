@@ -1,3 +1,5 @@
+:imagesdir: docs
+
 ## LND-L-PCA9685 - A 16 LED LocoNet decoder
 
 This is a firmware for LocoNet-only accessory decoder for 16 LEDs.
@@ -38,25 +40,133 @@ The board features:
 
 ### Aspect values
 
-* 1-head aspect
-** 0=off
-** 1=on
-** 2=blinking
-* 2-head aspect
-** 0 - all off
-** 1 - head 1 on
-** 2 - head 2 on
-** 3 - head 1 blink
-** 4 - alternating blink
-* 3-head aspect
-** 0 - all off
-** 1 - head 3 on
-** 2 - head 1 on
-** 3 - head 2 on
-** 4 - head 1 blink
-** 5 - head 2 blink
-** 6 - alternating heads 1 and 2 blink
-** 7 - head 3 blink
-** 8 - heads 1 and 3 on
+Aspects are modeled after http://www.modelldepo.ru/dcc/index.php?current_folder=46[ModellDepo TrafficLight  decoder (RU)], which model USSR and Russian signaling system. 
+
+Current version supports 1-, 2- and 3-lamp signals.
+
+:w20: width='20'
+[%header,cols="1a,2a,2a,2a,2a"]
+.1-lamp signal
+|===
+| 
+| image:1-r.png[{w20}] R
+| image:1-g.png[{w20}] G
+| image:1-y.png[{w20}] Y
+| 
+
+| 0
+| image:1-gr.png[{w20}]
+| image:1-gr.png[{w20}]
+| image:1-gr.png[{w20}]
+| image:1r-gr.png[{w20}]
+
+| 1
+| image:1-r.png[{w20}] 
+| image:1-g.png[{w20}]
+| image:1-y.png[{w20}]
+| 
+
+| 2
+| 
+| 
+| 
+| image:1r-w(bl).png[{w20}]
+
+|===
+
+[%header,cols="1a,2a,2a,2a,2a,2a"]
+.2-lamp signal
+|===
+| 
+| image:2-g-r.png[] GR
+| image:2-w-b.png[] WB
+| image:2-g-y.png[] GY
+| image:2h-r-r.png[] RR
+|  
+
+| 0
+| image:2-gr-gr.png[{w20}]
+| image:2-gr-gr.png[{w20}]
+| image:2-gr-gr.png[{w20}]
+| image:2h-gr-gr.png[]
+|
+
+| 1
+| image:2-g-gr.png[{w20}] 
+| image:2-w-gr.png[{w20}]
+| image:2-g-gr.png[{w20}]
+| 
+|
+
+| 2
+| image:2-gr-r.png[{w20}] 
+| image:2-gr-b.png[{w20}]
+| image:2-gr-y.png[{w20}]
+| |
+
+| 3 | | | | | image:2-w(bl)-gr.png[]
+
+| 4 | | | | image:2h-r(bl)-r(bl).png[] | 
+
+
+|===
+
+
+[%header,cols="1a,2a,2a,2a"]
+.3-lamp signal
+|===
+| 
+| image:3-y-g-r.png[] YGR
+| image:3-y-r-g.png[] YRG
+| image:3h-r-w-r.png[] RYR
+
+| 0
+| image:3-gr-gr-gr.png[]
+| image:3-gr-gr-gr.png[]
+| image:3h-gr-gr-gr.png[]
+
+
+| 1
+| image:3-gr-gr-r.png[] 
+| image:3-gr-gr-g.png[]
+| 
+
+| 2
+| image:3-y-gr-gr.png[] 
+| image:3-y-gr-gr.png[]
+| 
+
+| 3
+| image:3-gr-g-gr.png[] 
+| image:3-gr-r-gr.png[]
+| image:3h-gr-w-gr.png[]
+
+| 4
+| image:3-y(bl)-gr-gr.png[] 
+| image:3-y(bl)-gr-gr.png[]
+| 
+
+| 5
+| 
+| 
+| image:3h-gr-w(bl)-gr.png[]
+
+| 6
+| 
+| 
+| image:3h-r(bl)-gr-r(bl).png[]
+
+| 7
+| 
+| image:3-gr-gr-g(bl).png[]
+| 
+
+| 8
+| 
+| image:3-y-gr-g.png[]
+| 
+
+|===
+
 
 ### Configuration
