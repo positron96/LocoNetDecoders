@@ -97,10 +97,11 @@ private:
 
     void set1head() {
         switch(curAspect) {
+            case 0: OutputDriver::set(ch, 0); break;
             case 2:
                 lastChangeTime = millis();
             case 1: OutputDriver::set(ch, 1); break;
-            case 3: OutputDriver::set(ch, 0); break;
+            
         }
         
     }
@@ -117,6 +118,9 @@ private:
 
     void set2head() {
         switch(curAspect) {
+            case 0: 
+                OutputDriver::set2(ch, 0, 0,1); 
+                break;
             case 3:
             case 4: 
                 lastChangeTime = millis();
@@ -127,9 +131,6 @@ private:
             case 2:
                 OutputDriver::set(ch, 0); 
                 OutputDriver::set(ch+1, 1); 
-                break;
-            case 5: 
-                OutputDriver::set2(ch, 0, 0,1); 
                 break;
         }
     }
@@ -158,37 +159,37 @@ private:
 
     void set3head() {
         switch(curAspect) {
-            case 8:
+            case 0: 
+                OutputDriver::set2(ch, false, 0,1);
+                OutputDriver::set(ch+2, false );
+                break;
+            case 4:
                 lastChangeTime = millis();
             case 1:
-                OutputDriver::set2(ch, 0, 0,1 ); 
-                OutputDriver::set(ch+2, 1); 
+                OutputDriver::set2(ch, false, 1,2 ); 
+                OutputDriver::set(ch, true); 
                 break;
-            case 5: 
+            case 4: 
                 lastChangeTime = millis();
-            case 2:
-                OutputDriver::set2(ch, 0, 1,2 ); 
-                OutputDriver::set(ch, 1); 
+            case 5:
+                OutputDriver::set2(ch, false, 0,2 ); 
+                OutputDriver::set(ch+1, true); 
                 break;
             case 6:
                 lastChangeTime = millis();
             case 3:
-                OutputDriver::set2(ch, 0, 0,2); 
-                OutputDriver::set(ch+1, 1); 
+                OutputDriver::set2(ch, false, 0,1); 
+                OutputDriver::set(ch+2, true); 
                 break;
             case 7:
                 lastChangeTime = millis();
-                OutputDriver::set2(ch, 0, 1,2); 
-                OutputDriver::set(ch, 1); 
+                OutputDriver::set2(ch, false, 1,2); 
+                OutputDriver::set(ch, true); 
                 break;
-            case 9:
+            case 8:
                 lastChangeTime = millis();
-                OutputDriver::set(ch+1, 0); 
-                OutputDriver::set2(ch, 1, 0,2); 
-                break;
-            case 10: 
-                OutputDriver::set2(ch, 0, 0,1);
-                OutputDriver::set(ch+2, 0 );
+                OutputDriver::set(ch+1, false); 
+                OutputDriver::set2(ch, true, 0,2); 
                 break;
         }
     }
@@ -196,11 +197,14 @@ private:
     void tick3head() {
         if(millis() - lastChangeTime > BLINK_DUR) {
             switch(curAspect) {
-                case 5:
+                case 4:
                     OutputDriver::toggle(ch);
                     break;
-                case 6:
+                case 5:
                     OutputDriver::toggle(ch+1);
+                    break;
+                case 6: 
+                    OutputDriver::toggle(ch+2); 
                     break;
                 case 7:
                     if(OutputDriver::get(ch)) {
@@ -210,9 +214,6 @@ private:
                         OutputDriver::set(ch, 1);
                         OutputDriver::set(ch+2, 0);
                     }
-                    break;
-                case 8: 
-                    OutputDriver::toggle(ch+2); 
                     break;
             }
             lastChangeTime = millis();

@@ -127,21 +127,20 @@ Current version supports 1-, 2- and 3-lamp signals.
 | image:3-gr-gr-gr.png[]
 | image:3h-gr-gr-gr.png[]
 
-
-| 1 | 3rd lamp on
-| image:3-gr-gr-r.png[] 
-| image:3-gr-gr-g.png[]
-| 
-
-| 2 | 1st lamp on
+| 1 | 1st lamp on
 | image:3-y-gr-gr.png[] 
 | image:3-y-gr-gr.png[]
 | 
 
-| 3 | 2nd lamp on
+| 2 | 2nd lamp on
 | image:3-gr-g-gr.png[] 
 | image:3-gr-r-gr.png[]
 | image:3h-gr-w-gr.png[]
+
+| 3 | 3rd lamp on
+| image:3-gr-gr-r.png[] 
+| image:3-gr-gr-g.png[]
+| 
 
 | 4 | 1st lamp blink
 | image:3-y(bl)-gr-gr.png[] 
