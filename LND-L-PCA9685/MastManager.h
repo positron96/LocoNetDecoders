@@ -76,6 +76,15 @@ public:
 
     uint8_t getAspect() { return curAspect; }
 
+    uint8_t getNumAspects() const {  
+        switch(nheads() ) {
+            case 1: return 3;
+            case 2: return 5;
+            case 3: return 9;
+            default: return 0;
+        }
+    }
+
     void tick() {
         if(lastChangeTime==0) return;
         switch(nheads() ) {
@@ -254,7 +263,7 @@ public:
         ch_t ch=0;
         if(masts.size()>0) {
             const TMast &last = masts.back();
-            ch = last.ch + last.nheads() + 1;
+            ch = last.ch + last.nheads();
         }
         masts.push_back( TMast{busAddr, ch, nheads} ) ;
         return true;
@@ -268,10 +277,7 @@ public:
         masts.clear();
     }
 
-    typename MastsVector::const_iterator begin() const { return masts.cbegin(); }
-    typename MastsVector::const_iterator end() const { return masts.cend(); }
-    typename MastsVector::iterator begin() { return masts.begin(); }
-    typename MastsVector::iterator end() { return masts.end(); }
+    MastsVector & getMasts() { return masts; }
 
 
     static constexpr uint8_t EEPROM_VER = 1;
@@ -292,9 +298,9 @@ public:
         return true;
     }
 
-    void reset() {
-        clear();
-    }
+    void reset() {   clear();    }
+
+    size_t size() { return masts.size(); }
 
     bool save(int eepromAddr) {
         EEPROM.put<mast_idx_t>(eepromAddr, masts.size() );

@@ -112,8 +112,8 @@ public:
         set(pin, !get(pin)); 
     }
 
-    static void setMaxPWM(channel_t ch, uint16_t max) {
-        maxPWM[ch] = max >> PWM_BITSHIFT;
+    static void setMaxPWM(channel_t ch, uint8_t max) {
+        maxPWM[ch] = max >> (8-PWM_BITS);
     }
 
 private:

@@ -72,8 +72,6 @@ void setup() {
     PCADriver::initHw();
     digitalWrite(PIN_VEN, LOW); // enable 5Vo
 
-    Serial<<"cfg size "<<=EEPROM_HEADER_SIZE;
-
     static_assert( EEPROM_HEADER_SIZE + PCADriver::EEPROM_REQUIRED + TMastManager::EEPROM_REQUIRED < E2END, 
         "EEPROM size exceeded");
     eeprom_cfg_t cc;
@@ -94,11 +92,7 @@ void setup() {
     LocoNet.init(PIN_TX);  
 
     Serial<< F("Input start address is ") <<= startInAddr;
-    int i=0; 
-    for(const auto &m: masts) {
-        Serial<<F("Mast ")<<i<<F("; address=")<<m.busAddr()<<F("; output=")<<=m.ch;
-        i++;
-    }
+    listMasts();
     Serial<<= F("Init done");
 }
 
@@ -108,6 +102,15 @@ void save() {
     EEPROM.put<eeprom_cfg_t>(0, cc);;
     PCADriver::save(EEPROM_OUTPUTS_START);
     masts.save(EEPROM_MASTS_START);
+}
+
+void listMasts() {
+    int i=0; 
+    Serial<<F("Masts count: ")<<=masts.size();
+    for(const auto &m: masts.getMasts() ) {
+        Serial<<F("Mast ")<<i<<F("; addr=")<<m.busAddr()<<F("; channel=")<<=m.ch;
+        i++;
+    }
 }
 
 int hex2int(const char ch) {
@@ -266,29 +269,39 @@ void loop() {
 
     if(ser.checkSerial(Serial)) {
         char* cmd = ser.bufPart(0);
+        if(strlen(cmd)==1) {
+            int aspect = hex2int(cmd[0]);
+            if(aspect>=0 && aspect < masts.getMasts()[cmast].getNumAspects() ) {
+                masts.setAspect(cmast, aspect);
+                Serial<<F("Set mast ")<<cmast<<':'<<=aspect;
+            } else { Serial<<F("Bad aspect: ")<<=aspect;}
+        } else
         if(strcmp(cmd, "mast")==0) {
             cmast = atoi(ser.bufPart(1));
             Serial<<F("Current mast idx ")<<=cmast;
         } else 
-        if(strlen(cmd)==1) {
-            int aspect = hex2int(cmd[0]);
-            Serial<<F("Setting mast ")<<cmast<<':'<<=aspect;
-            masts.setAspect(cmast, aspect);
-        } else if(strcmp(cmd, "addmast")==0) {
-            int addr = atoi(ser.bufPart(1));
-            int nh = atoi(ser.bufPart(2));
-            Serial<<F("Adding mast addr=")<<addr<<F("; heads=")<<=nh;
+        if(strcmp(cmd, "addmast")==0) {
+            int nh = atoi(ser.bufPart(1));
+            int addr = atoi(ser.bufPart(2));
             masts.addMast(addr, nh);
+            Serial<<F("Added mast addr=")<<addr<<F("; heads=")<<=nh;
         } else
-        if(strcmp(cmd, "delmast")) {
-            Serial<<=F("Deleted last mast");
+        if(strcmp(cmd, "delmast")==0) {
             masts.deleteLastMast();
+            Serial<<=F("Deleted last mast");
+        } else
+        if(strcmp(cmd, "clearmasts")==0) {
+            masts.reset();
+            Serial<<=F("Deleted all masts");
+        } else
+        if(strcmp(cmd, "listmasts")==0) {
+            listMasts();
         } else
         if(strcmp(cmd, "br")==0) {
             PCADriver::channel_t ch = atoi(ser.bufPart(1));
             uint16_t mx = atoi(ser.bufPart(2));
-            Serial<<F("Setting max PWM for channel ")<<ch<<':'<<=mx;
             PCADriver::setMaxPWM( ch, mx );
+            Serial<<F("Set max PWM for channel ")<<ch<<':'<<=mx;
         } else
         if(strcmp(cmd, "reset")==0) {
             Serial<<=F("Loading defaults");
@@ -302,7 +315,7 @@ void loop() {
 
         if(strcmp(cmd, "off")==0) {
             Serial<<=F("All masts off");
-            for(auto& m: masts) {
+            for(auto& m: masts.getMasts() ) {
                 m.setAspect(0);
             }
         } else 
@@ -317,45 +330,12 @@ void loop() {
             int addr = atoi(ser.bufPart(1));
             Serial<<F("Input start address set to ")<<=addr;
             startInAddr = addr;
-        } 
+        } else
+
+        Serial<<=F("Unknown command");
 
     }
 
-
-/*
-            case 'h':
-                Serial.println("HIGH");
-                digitalWrite(PIN_OE, HIGH); // disable LED driver    
-                break;
-            case 'l':
-                Serial.println("LOW");
-                digitalWrite(PIN_OE, LOW);     
-                break;
-            case 'o':
-                Serial.println("OUT");
-                pinMode(PIN_OE, OUTPUT);
-                break;
-            case 'i':
-                Serial.println("IN");
-                pinMode(PIN_OE, INPUT);
-                break;
-            case ' ':
-                masts.setAspect(0, 1-masts.getAspect(0) );    
-                break;
-            default:
-                uint8_t ch = hex2int(t);
-                if(ch>=0 && ch<16) {
-                    //PCADriver::toggle(ch);
-                    masts.setAspect(0, ch );    
-                }
-                break;
-
-        }        
-        
-        
-    }
-
-*/
 }
 
 
