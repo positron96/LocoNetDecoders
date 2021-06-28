@@ -128,7 +128,7 @@ private:
     void set2head() {
         switch(curAspect) {
             case 0: 
-                OutputDriver::set2(ch, 0, 0,1); 
+                OutputDriver::template setn<0,1>(ch, false); 
                 break;
             case 3:
             case 4: 
@@ -168,37 +168,37 @@ private:
 
     void set3head() {
         switch(curAspect) {
-            case 0: 
-                OutputDriver::set2(ch, false, 0,1);
-                OutputDriver::set(ch+2, false );
+            case 0: {
+                OutputDriver::template setn<0,1,2>(ch, false);
                 break;
+            }
             case 4:
                 lastChangeTime = millis();
             case 1:
-                OutputDriver::set2(ch, false, 1,2 ); 
+                OutputDriver::template setn<1,2>(ch, false); 
                 OutputDriver::set(ch, true); 
                 break;
             case 5: 
                 lastChangeTime = millis();
             case 2:
-                OutputDriver::set2(ch, false, 0,2 ); 
+                OutputDriver::template setn<0,2>(ch, false); 
                 OutputDriver::set(ch+1, true); 
                 break;
             case 6:
                 lastChangeTime = millis();
             case 3:
-                OutputDriver::set2(ch, false, 0,1); 
+                OutputDriver::template setn<0,1>(ch, false); 
                 OutputDriver::set(ch+2, true); 
                 break;
             case 7:
                 lastChangeTime = millis();
-                OutputDriver::set2(ch, false, 1,2); 
+                OutputDriver::template setn<1,2>(ch, false); 
                 OutputDriver::set(ch, true); 
                 break;
             case 8:
                 lastChangeTime = millis();
                 OutputDriver::set(ch+1, false); 
-                OutputDriver::set2(ch, true, 0,2); 
+                OutputDriver::template setn<0,2>(ch, true); 
                 break;
         }
     }

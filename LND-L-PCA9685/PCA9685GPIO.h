@@ -64,7 +64,7 @@ public:
     }
 
     static void set(channel_t ch, bool val) {
-        if(get(ch)==val) return;
+        /*if(get(ch)==val) return;
 
         //Serial<<F("Setting channel ")<<ch<<F(" to ")<<=val;
 
@@ -78,10 +78,11 @@ public:
             }
         }
         pwm.setPWM(ch, dst);
-        curVal[ch] = val;
+        curVal[ch] = val;*/
+        setn<0>(ch,val);
     }
 
-    static void set2(channel_t ch0, bool val, uint8_t ofs1, uint8_t ofs2) {
+    /*static void set2(channel_t ch0, bool val, uint8_t ofs1, uint8_t ofs2) {
         channel_t ch1=ch0+ofs1, ch2=ch0+ofs2;
         if(get(ch1)==val && get(ch2)==val) return;
 
@@ -102,6 +103,43 @@ public:
         pwm.setPWM(ch2, dst2);
         curVal[ch1] = val;
         curVal[ch2] = val;
+    }*/
+
+    template<uint8_t ... ofs>
+    static void setn(channel_t ch0, bool val) {
+        //uint8_t ofs_[] = { ofs... };
+        const uint8_t N = sizeof...(ofs);
+        const channel_t ch[] = { channel_t(ch0+ofs)... };
+        setN<N>(ch, val);
+    }
+
+    template<uint8_t N>
+    static void setN(const channel_t ch[], bool val) {
+        //for(uint8_t i=0; i<N; i++) ch[i] = ch0 + ofs_[i];
+        bool allgood = true;
+        for(uint8_t i=0; i<N; i++) if(get(ch[i])!=val) allgood=false;
+        if(allgood) return;
+
+        int16_t dst[N];
+        for(uint8_t i=0; i<N; i++) dst[i] = val ? maxPWM12(ch[i]) : 0;
+
+        if(fade[ch[0]]) {
+            int16_t src[N];
+
+            for(uint8_t i=0; i<N; i++) src[i] = get(ch[i]) ? maxPWM12(ch[i]) : 0;
+            for(uint8_t step=0; step<RES; step++) {
+                uint16_t t;
+                for(uint8_t i=0; i<N; i++) {
+                    t = src[i] + (dst[i]-src[i])*step/RES;
+                    pwm.setPWM(ch[i], t);
+                }
+                delay(TRANS_TIME/RES);
+            }
+        }
+        for(uint8_t i=0; i<N; i++) {
+            pwm.setPWM(ch[i], dst[i]);
+            curVal[ch[i]] = val;
+        }
     }
 
     static bool get(channel_t pin) {
