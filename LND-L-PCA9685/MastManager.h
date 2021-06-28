@@ -169,9 +169,9 @@ private:
                 OutputDriver::set2(ch, false, 1,2 ); 
                 OutputDriver::set(ch, true); 
                 break;
-            case 4: 
+            case 5: 
                 lastChangeTime = millis();
-            case 5:
+            case 2:
                 OutputDriver::set2(ch, false, 0,2 ); 
                 OutputDriver::set(ch+1, true); 
                 break;

@@ -24,6 +24,10 @@ using PCADriver = PCA9685GPIO<PIN_OE>;
 using TMastManager = MastManager<PCADriver::CH_OUT_COUNT/2, PCADriver>;
 TMastManager masts;
 
+struct eeprom_cfg_t {
+    uint8_t ver;
+    uint16_t inAddr;
+} __attribute__((packed));
 
 uint16_t startInAddr;
 
@@ -40,10 +44,11 @@ constexpr int LED_INTL_NORMAL = 1000;
 constexpr int LED_INTL_CONFIG1 = 400;
 constexpr int LED_INTL_CONFIG2 = 150;
 
-constexpr uint8_t EEPROM_VER = PCADriver::EEPROM_VER ^ TMastManager::EEPROM_VER;
-constexpr int EEPROM_HEADER_SIZE = 1;
+constexpr int EEPROM_HEADER_SIZE = sizeof(eeprom_cfg_t);
 constexpr int EEPROM_OUTPUTS_START = EEPROM_HEADER_SIZE;
 constexpr int EEPROM_MASTS_START = EEPROM_OUTPUTS_START + PCADriver::EEPROM_REQUIRED;
+
+constexpr uint8_t EEPROM_VER = PCADriver::EEPROM_VER ^ TMastManager::EEPROM_VER ^ EEPROM_HEADER_SIZE;
 
 void ledFire(uint32_t, uint8_t);
 void ledStop();
@@ -67,25 +72,27 @@ void setup() {
     PCADriver::initHw();
     digitalWrite(PIN_VEN, LOW); // enable 5Vo
 
-    static_assert( EEPROM_HEADER_SIZE + PCADriver::EEPROM_REQUIRED + TMastManager::EEPROM_REQUIRED < E2END, "EEPROM size exceeded");
-    uint8_t ver = EEPROM.read(0);
-    if(ver == EEPROM_VER) {
+    Serial<<"cfg size "<<=EEPROM_HEADER_SIZE;
+
+    static_assert( EEPROM_HEADER_SIZE + PCADriver::EEPROM_REQUIRED + TMastManager::EEPROM_REQUIRED < E2END, 
+        "EEPROM size exceeded");
+    eeprom_cfg_t cc;
+    EEPROM.get<eeprom_cfg_t>(0, cc);
+    if(cc.ver == EEPROM_VER) {
+        startInAddr = cc.inAddr;  
         PCADriver::load(EEPROM_OUTPUTS_START);
         masts.load(EEPROM_MASTS_START);
     } else {
         Serial<<=F("Bad EEPROM, loading default values");
+        startInAddr = 10;
         PCADriver::reset();
         masts.reset();
         save();
     } 
-
     
     
     LocoNet.init(PIN_TX);  
 
-    //startOutAddr = sv.readSVNodeId(); 
-    startInAddr = 10;
-    
     Serial<< F("Input start address is ") <<= startInAddr;
     int i=0; 
     for(const auto &m: masts) {
@@ -96,7 +103,9 @@ void setup() {
 }
 
 void save() {
-    EEPROM.put<uint8_t>(0, EEPROM_VER);
+    eeprom_cfg_t cc{ .ver=EEPROM_VER, .inAddr=startInAddr };
+
+    EEPROM.put<eeprom_cfg_t>(0, cc);;
     PCADriver::save(EEPROM_OUTPUTS_START);
     masts.save(EEPROM_MASTS_START);
 }
@@ -302,7 +311,13 @@ void loop() {
             int v = atoi(ser.bufPart(2));
             Serial<<F("Setting ch ")<<ch<<F(" to ")<<=v;
             PCADriver::set(ch, v!=0);
-        }
+        } else 
+
+        if(strcmp(cmd, "inaddr")==0) {
+            int addr = atoi(ser.bufPart(1));
+            Serial<<F("Input start address set to ")<<=addr;
+            startInAddr = addr;
+        } 
 
     }
 
@@ -351,38 +366,34 @@ void notifySwitchRequest( uint16_t addr, uint8_t out, uint8_t dir ) {
     bool on = out!=0;
     bool thrown = dir==0;
     
-    Serial.print("Switch Request: ");
-    Serial.print(addr, DEC);
-    Serial.print(':');
-    Serial.print(dir ? "Closed" : "Thrown");
-    Serial.print(" - ");
-    Serial.println(out ? "On" : "Off");
+    Serial<<F("Switch Request: ")<<addr<<':'<< (dir?'C':'T') << ':' <<= (out ? "On" : "Off");
 
     if(!on) return;
 
     if(!configMode) {
-        uint16_t idx = masts.findAddr(addr);
+        int16_t idx = masts.findAddr(addr);
         if(idx>=0) {
             ledFire(100);
             masts.setAspect(idx, thrown?1:0);
         }
         return;
-    }
+    } else {
 
-    // set addr
-    if(thrown) {
-        if(configVar==0) {
-            configVar = addr;
-            Serial.print("Var=");
-            Serial.println(configVar);
-        } else {
-            //startOutAddr = addr;
-            //sv.writeSvNodeId(startOut);
-            Serial.print("Changed start address to ");
-            //Serial.println(startOutAddr);
-            configVar = 0;
+        // set addr
+        if(thrown) {
+            if(configVar==0) {
+                configVar = addr;
+                Serial.print("Var=");
+                Serial.println(configVar);
+            } else {
+                //startOutAddr = addr;
+                //sv.writeSvNodeId(startOut);
+                Serial.print(F("Changed start address to "));
+                //Serial.println(startOutAddr);
+                configVar = 0;
+            }
+            ledFire(2000);
         }
-        ledFire(2000);
     }
 
 }

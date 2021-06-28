@@ -13,8 +13,6 @@ class PCA9685GPIO {
 public:
     using channel_t = uint8_t;
     constexpr static channel_t CH_OUT_COUNT = 16;
-    static PCA9685Driver pwm;
-    static uint8_t maxPWM[CH_OUT_COUNT]; ///< divided by 16 (actual max is 12bits) 
 
     static void initHw() {
         pwm = PCA9685Driver(0x40);
@@ -119,6 +117,10 @@ public:
     }
 
 private:
+
+    static PCA9685Driver pwm;
+    static uint8_t maxPWM[CH_OUT_COUNT]; ///< divided by 16 (actual max is 12bits) 
+
     static etl::bitset<CH_OUT_COUNT> fade;
     static etl::bitset<CH_OUT_COUNT> curVal;
     
