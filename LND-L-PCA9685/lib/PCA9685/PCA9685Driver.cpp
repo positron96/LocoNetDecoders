@@ -6,13 +6,6 @@
 /*!
  *  @brief  Instantiates a new PCA9685 PWM driver chip with the I2C address on a
  * TwoWire interface
- */
-PCA9685Driver::PCA9685Driver()
-        : PCA9685Driver(PCA9685_I2C_DEFAULT_ADDRESS, Wire) {}
-
-/*!
- *  @brief  Instantiates a new PCA9685 PWM driver chip with the I2C address on a
- * TwoWire interface
  *  @param  addr The 7-bit I2C address to locate this chip, default is 0x40
  */
 PCA9685Driver::PCA9685Driver(const uint8_t addr)

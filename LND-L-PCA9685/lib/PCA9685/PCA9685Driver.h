@@ -58,7 +58,12 @@ public:
 
   enum class OeMode { LOWVAL, HIGHZ, OUTDRV };
 
-  PCA9685Driver();
+  /*!
+  *  @brief  Instantiates a new PCA9685 PWM driver chip with the I2C address on a
+  * TwoWire interface
+  */
+  constexpr PCA9685Driver(): _i2caddr(PCA9685_I2C_DEFAULT_ADDRESS), _i2c(&Wire), _oscillator_freq(0) 
+    {};
   PCA9685Driver(const uint8_t addr);
   PCA9685Driver(const uint8_t addr, TwoWire &i2c);
   void setAddr(const uint8_t addr);

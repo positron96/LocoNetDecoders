@@ -5,7 +5,7 @@
 class SerialReader {
 public:
 
-    SerialReader(): bufLen(0) {
+    constexpr SerialReader():buf{0},  bufLen(0), parts{nullptr}, nParts(0) {
         
     }
 
