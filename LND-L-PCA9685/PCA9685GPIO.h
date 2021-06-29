@@ -7,6 +7,7 @@
 #include <etl/bitset.h>
 #include "SerialUtils.h"
 #include <EEPROM.h>
+#include <etl/type_traits.h>
 
 template<uint8_t PIN_OEn>
 class PCA9685GPIO {
@@ -64,60 +65,20 @@ public:
     }
 
     static void set(channel_t ch, bool val) {
-        /*if(get(ch)==val) return;
-
-        //Serial<<F("Setting channel ")<<ch<<F(" to ")<<=val;
-
-        int16_t dst = val ? maxPWM12(ch) : 0;
-        if(fade[ch]) {
-            int16_t src = (!val)?maxPWM12(ch) : 0;
-            for(uint8_t i=0; i<RES; i++) {
-                uint16_t t = src + (dst-src)*i/RES;
-                pwm.setPWM(ch, t);
-                delay(TRANS_TIME/RES);
-            }
-        }
-        pwm.setPWM(ch, dst);
-        curVal[ch] = val;*/
-        setn<0>(ch,val);
+        setn<1>(ch, val, 0);
     }
 
-    /*static void set2(channel_t ch0, bool val, uint8_t ofs1, uint8_t ofs2) {
-        channel_t ch1=ch0+ofs1, ch2=ch0+ofs2;
-        if(get(ch1)==val && get(ch2)==val) return;
 
-        int16_t dst1 = val ? maxPWM12(ch1) : 0;
-        int16_t dst2 = val ? maxPWM12(ch2) : 0;
-        if(fade[ch0+ofs1]) {
-            int16_t src1 = get(ch1) ? maxPWM12(ch1) : 0;
-            int16_t src2 = get(ch2) ? maxPWM12(ch2) : 0;
-            for(uint8_t i=0; i<RES; i++) {
-                uint16_t t1 = src1 + (dst1-src1)*i/RES;
-                uint16_t t2 = src2 + (dst2-src2)*i/RES;
-                pwm.setPWM(ch1, t1);
-                pwm.setPWM(ch2, t2);
-                delay(TRANS_TIME/RES);
-            }
-        }
-        pwm.setPWM(ch1, dst1);
-        pwm.setPWM(ch2, dst2);
-        curVal[ch1] = val;
-        curVal[ch2] = val;
-    }*/
+    static constexpr uint8_t MAX_CH = 3;
 
-    template<uint8_t ... ofs>
-    static void setn(channel_t ch0, bool val) {
-        //uint8_t ofs_[] = { ofs... };
-        const uint8_t N = sizeof...(ofs);
-        const channel_t ch[] = { channel_t(ch0+ofs)... };
-        setN<N>(ch, val);
-    }
-
-    template<uint8_t N>
-    static void setN(const channel_t ch[], bool val) {
-        //for(uint8_t i=0; i<N; i++) ch[i] = ch0 + ofs_[i];
+    template<uint8_t N, typename... Offsets, 
+        etl::enable_if_t<sizeof...(Offsets) == N, int> = 0,
+        etl::enable_if_t<etl::are_all_same<int, Offsets...>::value, int> = 0,
+        etl::enable_if_t<N<=MAX_CH, int> = 0 >
+    static void setn(const channel_t ch0, bool val, const Offsets... ofs_) {
+        const channel_t ch[] = { channel_t(ch0+ofs_)... };
         bool allgood = true;
-        for(uint8_t i=0; i<N; i++) if(get(ch[i])!=val) allgood=false;
+        for(uint8_t i=0; i<N; i++) if(get(ch[i])!=val) allgood = false;
         if(allgood) return;
 
         int16_t dst[N];
@@ -128,9 +89,8 @@ public:
 
             for(uint8_t i=0; i<N; i++) src[i] = get(ch[i]) ? maxPWM12(ch[i]) : 0;
             for(uint8_t step=0; step<RES; step++) {
-                uint16_t t;
                 for(uint8_t i=0; i<N; i++) {
-                    t = src[i] + (dst[i]-src[i])*step/RES;
+                    uint16_t t = src[i] + (dst[i]-src[i])*step/RES;
                     pwm.setPWM(ch[i], t);
                 }
                 delay(TRANS_TIME/RES);
