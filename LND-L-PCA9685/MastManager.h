@@ -76,15 +76,6 @@ public:
 
     uint8_t getAspect() { return curAspect; }
 
-    uint8_t getNumAspects() const {  
-        switch(nheads() ) {
-            case 1: return 3;
-            case 2: return 5;
-            case 3: return 9;
-            default: return 0;
-        }
-    }
-
     void tick() {
         if(lastChangeTime==0) return;
         switch(nheads() ) {
@@ -98,7 +89,8 @@ public:
         switch(nheads()) {
             case 1: return 3;
             case 2: return 5;
-            case 3: return 10;
+            case 3: return 9;
+            default: return 0;
         }
     }
 

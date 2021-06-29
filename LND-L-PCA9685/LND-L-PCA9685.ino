@@ -181,7 +181,7 @@ void checkInputs() {
             if(lastIns[i] == in) {
                 // in = jitter-free value
                 uint16_t inAddr = startInAddr+i;
-                Serial<<F("Input ")<<i<<"(addr "<<inAddr<<F(") changed to ")<<=in;
+                Serial<<F("Input ")<<i<<F("(addr ")<<inAddr<<F(") changed to ")<<=in;
                 ledFire(100);
                 LocoNet.reportSensor(inAddr, in);
             }
@@ -271,7 +271,7 @@ void loop() {
         char* cmd = ser.bufPart(0);
         if(strlen(cmd)==1) {
             int aspect = hex2int(cmd[0]);
-            if(aspect>=0 && aspect < masts.getMasts()[cmast].getNumAspects() ) {
+            if(aspect>=0 && aspect < masts.getMasts()[cmast].getAspectCount() ) {
                 masts.setAspect(cmast, aspect);
                 Serial<<F("Set mast ")<<cmast<<':'<<=aspect;
             } else { Serial<<F("Bad aspect: ")<<=aspect;}
@@ -346,15 +346,16 @@ void notifySwitchRequest( uint16_t addr, uint8_t out, uint8_t dir ) {
     bool on = out!=0;
     bool thrown = dir==0;
     
-    Serial<<F("Switch Request: ")<<addr<<':'<< (dir?'C':'T') << ':' <<= (out ? '+' : '-');
+    Serial<<F("Switch Request: ")<<addr<<':'<< (dir?'C':'T') << ':' <<= (out?'+':'-');
 
     if(!on) return;
 
     if(!configMode) {
-        int16_t idx = masts.findAddr(addr);
-        if(idx>=0) {
-            ledFire(100);
-            masts.setAspect(idx, thrown?1:0);
+        for(auto &m: masts.getMasts() ) {
+            if(addr >= m.busAddr() && addr<m.busAddr() + m.getAspectCount() ) {
+                ledFire(100);
+                m.setAspect(addr-m.busAddr());
+            }
         }
         return;
     } else {
@@ -363,12 +364,11 @@ void notifySwitchRequest( uint16_t addr, uint8_t out, uint8_t dir ) {
         if(thrown) {
             if(configVar==0) {
                 configVar = addr;
-                Serial.print("Var=");
-                Serial.println(configVar);
+                Serial<<F("Selected var ")<<=configVar;
             } else {
                 //startOutAddr = addr;
                 //sv.writeSvNodeId(startOut);
-                Serial.print(F("Changed start address to "));
+                //Serial.print(F("Changed start address to "));
                 //Serial.println(startOutAddr);
                 configVar = 0;
             }
