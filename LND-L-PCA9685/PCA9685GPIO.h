@@ -2,9 +2,6 @@
 
 #include <Arduino.h>
 #include "PCA9685Driver.h"
-#undef min
-#undef max
-#include <etl/bitset.h>
 #include "SerialUtils.h"
 #include <EEPROM.h>
 #include <etl/type_traits.h>
@@ -16,7 +13,7 @@ public:
     constexpr static channel_t CH_OUT_COUNT = 16;
 
     static void initHw() {
-        pwm = PCA9685Driver(0x40);
+        //pwm = PCA9685Driver(0x40);
         
         pinMode(PIN_OEn, OUTPUT);
         digitalWrite(PIN_OEn, HIGH); // disable pca
@@ -41,24 +38,25 @@ public:
     static constexpr int EEPROM_REQUIRED = CH_OUT_COUNT*2;
     static bool load(int eepromAddr) {
         for(channel_t i=0; i<CH_OUT_COUNT; i++) {
-            EEPROM.get<uint8_t>(eepromAddr, maxPWM[i]);
+            EEPROM.get<uint8_t>(eepromAddr, states[i].maxPWM);
             uint8_t f;
             EEPROM.get<uint8_t>(eepromAddr+1, f);
-            fade[i] = f!=0;
+            states[i].fade = f!=0;
             eepromAddr+=2;
         }
         return true;
     }
     static void reset() {
         for(channel_t ch=0; ch<CH_OUT_COUNT; ch++) {
-            maxPWM[ch] = 32;
-            fade[ch] = true;
+            states[ch].maxPWM = 32;
+            states[ch].fade = true;
+            states[ch].curVal = false;
         }
     }
     static bool save(int eepromAddr) {
         for(channel_t i=0; i<CH_OUT_COUNT; i++) {
-            EEPROM.put<uint8_t>(eepromAddr, maxPWM[i]);
-            EEPROM.put<uint8_t>(eepromAddr+1, fade[i] ? 255 : 0);
+            EEPROM.put<uint8_t>(eepromAddr, states[i].maxPWM);
+            EEPROM.put<uint8_t>(eepromAddr+1, states[i].fade ? 255 : 0);
             eepromAddr+=2;
         }
         return true;
@@ -84,7 +82,7 @@ public:
         int16_t dst[N];
         for(uint8_t i=0; i<N; i++) dst[i] = val ? maxPWM12(ch[i]) : 0;
 
-        if(fade[ch[0]]) {
+        if(states[ch[0]].fade) {
             int16_t src[N];
 
             for(uint8_t i=0; i<N; i++) src[i] = get(ch[i]) ? maxPWM12(ch[i]) : 0;
@@ -98,29 +96,33 @@ public:
         }
         for(uint8_t i=0; i<N; i++) {
             pwm.setPWM(ch[i], dst[i]);
-            curVal[ch[i]] = val;
+            states[ch[i]].curVal = val;
         }
     }
 
-    static bool get(channel_t pin) {
-        return curVal[pin];
+    static bool get(channel_t ch) {
+        return states[ch].curVal;
     }
 
     static void toggle(channel_t pin) {
         set(pin, !get(pin)); 
     }
 
-    static void setMaxPWM(channel_t ch, uint8_t max) {
-        maxPWM[ch] = max >> (8-PWM_BITS);
+    static void setMaxPWM(channel_t ch, uint8_t mx) {
+        states[ch].maxPWM = mx >> (8-PWM_BITS);
     }
 
 private:
 
-    static PCA9685Driver pwm;
-    static uint8_t maxPWM[CH_OUT_COUNT]; ///< divided by 16 (actual max is 12bits) 
+    struct state_t {
+        uint8_t maxPWM;///< divided by 16 (actual max is 12bits) 
+        bool curVal:1;
+        bool fade:1;
+    } __attribute__((packed));
 
-    static etl::bitset<CH_OUT_COUNT> fade;
-    static etl::bitset<CH_OUT_COUNT> curVal;
+    static PCA9685Driver pwm;
+
+    static state_t states[CH_OUT_COUNT];
     
     static constexpr uint32_t TRANS_TIME = 100; // ms
     static constexpr uint8_t RES = 8;
@@ -129,7 +131,7 @@ private:
     static constexpr uint8_t PWM_BITSHIFT = 12-PWM_BITS;
 
     static uint16_t maxPWM12(channel_t ch) {
-        return maxPWM[ch] << PWM_BITSHIFT;
+        return states[ch].maxPWM << PWM_BITSHIFT;
     }
 
 };
@@ -138,10 +140,6 @@ template<uint8_t OE>
 PCA9685Driver PCA9685GPIO<OE>::pwm;
 
 template<uint8_t OE>
-uint8_t PCA9685GPIO<OE>::maxPWM[PCA9685GPIO<OE>::CH_OUT_COUNT];
+typename PCA9685GPIO<OE>::state_t PCA9685GPIO<OE>::states[PCA9685GPIO<OE>::CH_OUT_COUNT];
 
-template<uint8_t OE>
-etl::bitset<PCA9685GPIO<OE>::CH_OUT_COUNT> PCA9685GPIO<OE>::fade;
 
-template<uint8_t OE>
-etl::bitset<PCA9685GPIO<OE>::CH_OUT_COUNT> PCA9685GPIO<OE>::curVal;

@@ -21,7 +21,7 @@ PCA9685Driver::PCA9685Driver(const uint8_t addr)
 PCA9685Driver::PCA9685Driver(const uint8_t addr, TwoWire &i2c)
         : _i2caddr(addr), _i2c(&i2c) 
 {
-    setOscillatorFrequency(FREQUENCY_OSCILLATOR_FREQ);
+    
 }
 
 void PCA9685Driver::setAddr(const uint8_t addr) {
@@ -100,26 +100,26 @@ void PCA9685Driver::setExtClk(uint8_t prescale) {
 }
 
 /*!
- *  @brief  Sets the PWM frequency for the entire chip, up to ~1.6 KHz
- *  @param  freq Floating point frequency that we will attempt to match
+ *  @brief  Sets the PWM frequency for the entire chip, up to ~1600 Hz (on internal 25 MHz crystal)
+ *  @param  freq  point frequency that we will attempt to match, in Hz
  */
-void PCA9685Driver::setPWMFreq(float freq) {
+void PCA9685Driver::setPWMFreq(uint16_t freq) {
 #ifdef ENABLE_DEBUG_OUTPUT
     Serial.print("Attempting to set freq ");
     Serial.println(freq);
 #endif
     // Range output modulation frequency is dependant on oscillator
-    if (freq < 1)
-        freq = 1;
-    if (freq > 3500)
-        freq = 3500; // Datasheet limit is 3052=50MHz/(4*4096)
+    if (freq < 24)
+        freq = 24; // 24 Hz if lowest for maximum 0xFF prescaler and 25 MHz
+    if (freq > 1526)
+        freq = 1526; // With minimal prescaler 0x3 and 25 MHz
 
-    float prescaleval = ((_oscillator_freq / (freq * 4096.0)) + 0.5) - 1;
-    if (prescaleval < PCA9685_PRESCALE_MIN)
-        prescaleval = PCA9685_PRESCALE_MIN;
-    if (prescaleval > PCA9685_PRESCALE_MAX)
-        prescaleval = PCA9685_PRESCALE_MAX;
-    uint8_t prescale = (uint8_t)prescaleval;
+    uint32_t prescale = (FREQUENCY_OSCILLATOR_FREQ / (freq * 4096)) - 1;
+    if (prescale < PCA9685_PRESCALE_MIN)
+        prescale = PCA9685_PRESCALE_MIN;
+    if (prescale > PCA9685_PRESCALE_MAX)
+        prescale = PCA9685_PRESCALE_MAX;
+    
 
 #ifdef ENABLE_DEBUG_OUTPUT
     Serial.print("Final pre-scale: ");
@@ -129,7 +129,7 @@ void PCA9685Driver::setPWMFreq(float freq) {
     uint8_t oldmode = read8(PCA9685_MODE1);
     uint8_t newmode = (oldmode & ~MODE1_RESTART) | MODE1_SLEEP; // sleep
     write8(PCA9685_MODE1, newmode);                             // go to sleep
-    write8(PCA9685_PRESCALE, prescale); // set the prescaler
+    write8(PCA9685_PRESCALE, (uint8_t)prescale); // set the prescaler
     write8(PCA9685_MODE1, oldmode);
     delay(5);
 
@@ -232,30 +232,20 @@ void PCA9685Driver::setRaw(uint8_t num, uint16_t on, uint16_t off) {
  * from 0 to 4095 inclusive.
  *   @param  invert If true, inverts the output, defaults to 'false'
  */
-void PCA9685Driver::setPWM(uint8_t num, uint16_t val, bool invert) {
+void PCA9685Driver::setPWM(uint8_t num, uint16_t val) {
     // Clamp value between 0 and 4095 inclusive.
     val = min(val, (uint16_t)PCA9685_MAX_PWM);
-    if (invert) {
-        if (val == 0) {
-            // Special value for signal fully on.
-            setRaw(num, PCA9685_FULL_PWM, 0);
-        } else if (val == PCA9685_MAX_PWM) {
-            // Special value for signal fully off.
-            setRaw(num, 0, PCA9685_FULL_PWM);
-        } else {
-            setRaw(num, 0, PCA9685_MAX_PWM - val);
-        }
+    
+    if (val == PCA9685_MAX_PWM) {
+        // Special value for signal fully on.
+        setRaw(num, PCA9685_FULL_PWM, 0);
+    } else if (val == 0) {
+        // Special value for signal fully off.
+        setRaw(num, 0, PCA9685_FULL_PWM);
     } else {
-        if (val == PCA9685_MAX_PWM) {
-            // Special value for signal fully on.
-            setRaw(num, PCA9685_FULL_PWM, 0);
-        } else if (val == 0) {
-            // Special value for signal fully off.
-            setRaw(num, 0, PCA9685_FULL_PWM);
-        } else {
-            setRaw(num, 0, val);
-        }
+        setRaw(num, 0, val);
     }
+    
 }
 
 /*!
@@ -264,67 +254,49 @@ void PCA9685Driver::setPWM(uint8_t num, uint16_t val, bool invert) {
  *  @param  num One of the PWM output pins, from 0 to 15
  *  @param  Microseconds The number of Microseconds to turn the PWM output ON
  */
-void PCA9685Driver::writeMicroseconds(uint8_t num,
-                                                                                                uint16_t Microseconds) {
-#ifdef ENABLE_DEBUG_OUTPUT
-    Serial.print("Setting PWM Via Microseconds on output");
-    Serial.print(num);
-    Serial.print(": ");
-    Serial.print(Microseconds);
-    Serial.println("->");
-#endif
+// void PCA9685Driver::writeMicroseconds(uint8_t num,
+//                                                                                                 uint16_t Microseconds) {
+// #ifdef ENABLE_DEBUG_OUTPUT
+//     Serial.print("Setting PWM Via Microseconds on output");
+//     Serial.print(num);
+//     Serial.print(": ");
+//     Serial.print(Microseconds);
+//     Serial.println("->");
+// #endif
 
-    double pulse = Microseconds;
-    double pulselength;
-    pulselength = 1000000; // 1,000,000 us per second
+//     double pulse = Microseconds;
+//     double pulselength;
+//     pulselength = 1000000; // 1,000,000 us per second
 
-    // Read prescale
-    uint16_t prescale = readPrescale();
+//     // Read prescale
+//     uint16_t prescale = readPrescale();
 
-#ifdef ENABLE_DEBUG_OUTPUT
-    Serial.print(prescale);
-    Serial.println(" PCA9685 chip prescale");
-#endif
+// #ifdef ENABLE_DEBUG_OUTPUT
+//     Serial.print(prescale);
+//     Serial.println(" PCA9685 chip prescale");
+// #endif
 
-    // Calculate the pulse for PWM based on Equation 1 from the datasheet section
-    // 7.3.5
-    prescale += 1;
-    pulselength *= prescale;
-    pulselength /= _oscillator_freq;
+//     // Calculate the pulse for PWM based on Equation 1 from the datasheet section
+//     // 7.3.5
+//     prescale += 1;
+//     pulselength *= prescale;
+//     pulselength /= _oscillator_freq;
 
-#ifdef ENABLE_DEBUG_OUTPUT
-    Serial.print(pulselength);
-    Serial.println(" us per bit");
-#endif
+// #ifdef ENABLE_DEBUG_OUTPUT
+//     Serial.print(pulselength);
+//     Serial.println(" us per bit");
+// #endif
 
-    pulse /= pulselength;
+//     pulse /= pulselength;
 
-#ifdef ENABLE_DEBUG_OUTPUT
-    Serial.print(pulse);
-    Serial.println(" pulse for PWM");
-#endif
+// #ifdef ENABLE_DEBUG_OUTPUT
+//     Serial.print(pulse);
+//     Serial.println(" pulse for PWM");
+// #endif
 
-    setRaw(num, 0, pulse);
-}
+//     setRaw(num, 0, pulse);
+// }
 
-/*!
- *  @brief  Getter for the internally tracked oscillator used for freq
- * calculations
- *  @returns The frequency the PCA9685 thinks it is running at (it cannot
- * introspect)
- */
-uint32_t PCA9685Driver::getOscillatorFrequency(void) {
-    return _oscillator_freq;
-}
-
-/*!
- *  @brief Setter for the internally tracked oscillator used for freq
- * calculations
- *  @param freq The frequency the PCA9685 should use for frequency calculations
- */
-void PCA9685Driver::setOscillatorFrequency(uint32_t freq) {
-    _oscillator_freq = freq;
-}
 
 /******************* Low level I2C interface */
 uint8_t PCA9685Driver::read8(uint8_t addr) {

@@ -62,8 +62,7 @@ public:
   *  @brief  Instantiates a new PCA9685 PWM driver chip with the I2C address on a
   * TwoWire interface
   */
-  constexpr PCA9685Driver(): _i2caddr(PCA9685_I2C_DEFAULT_ADDRESS), _i2c(&Wire), _oscillator_freq(0) 
-    {};
+  constexpr PCA9685Driver(): _i2caddr(PCA9685_I2C_DEFAULT_ADDRESS), _i2c(&Wire) {};
   PCA9685Driver(const uint8_t addr);
   PCA9685Driver(const uint8_t addr, TwoWire &i2c);
   void setAddr(const uint8_t addr);
@@ -73,7 +72,7 @@ public:
   void wakeup();
   void restart();
   void setExtClk(uint8_t prescale);
-  void setPWMFreq(float freq);
+  void setPWMFreq(uint16_t freq);
   void setOutputMode(bool totempole);
   void setOpenDrainOutput() { setOutputMode(false); }
   void setTotempoleOutput() { setOutputMode(true); }
@@ -81,19 +80,12 @@ public:
   void setInvertMode(const bool invert);
   //uint8_t getPWM(uint8_t num);
   void setRaw(uint8_t num, uint16_t on, uint16_t off);
-  void setPWM(uint8_t num, uint16_t val, bool invert = false);
+  void setPWM(uint8_t num, uint16_t val);
   uint8_t readPrescale(void);
   
-  void writeMicroseconds(uint8_t num, uint16_t Microseconds);
-
-  void setOscillatorFrequency(uint32_t freq);
-  uint32_t getOscillatorFrequency(void);
-
 private:
   uint8_t _i2caddr;
   TwoWire *_i2c;
-
-  uint32_t _oscillator_freq;
 
   uint8_t read8(uint8_t addr);
   void write8(uint8_t addr, uint8_t d);
