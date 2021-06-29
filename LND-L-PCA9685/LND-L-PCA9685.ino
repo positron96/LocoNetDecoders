@@ -346,7 +346,7 @@ void notifySwitchRequest( uint16_t addr, uint8_t out, uint8_t dir ) {
     bool on = out!=0;
     bool thrown = dir==0;
     
-    Serial<<F("Switch Request: ")<<addr<<':'<< (dir?'C':'T') << ':' <<= (out ? "On" : "Off");
+    Serial<<F("Switch Request: ")<<addr<<':'<< (dir?'C':'T') << ':' <<= (out ? '+' : '-');
 
     if(!on) return;
 
