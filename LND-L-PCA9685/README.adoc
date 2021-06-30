@@ -1,3 +1,5 @@
+:imagesdir: docs
+
 ## LND-L-PCA9685 - A 16 LED LocoNet decoder
 
 This is a firmware for LocoNet-only accessory decoder for 16 LEDs.
@@ -15,10 +17,10 @@ Features:
 
 Extra functionality:
 
-* 8 digital inputs value (reported to LocoNet)
+* 8 digital inputs value that are reported to LocoNet (Can be used as sensor board)
 * 2 analog inputs
 
-### Hardware
+## Hardware
 
 The firmware is designed to work with this decoder board:
 
@@ -26,15 +28,147 @@ The firmware is designed to work with this decoder board:
 
 * https://oshwlab.com/positron96/test-pcb-pattern_copy[LocoNet breakout board at OSHWLAB]
 
-The board features
+The board features:
 
 * Arduino Pro Mini socket
 * PCA9685 board socket
-* 2 LocoNet ports
+* 2 LocoNet jacks
 * Can be powered through LocoNet bus or from external power connector
 * Button to enter configuration
 * Indicator LED
 
 ## User manual
+
+### Aspect values
+
+Aspects are modeled after http://www.modelldepo.ru/dcc/index.php?current_folder=46[ModellDepo TrafficLight  decoder (RU)], which supports USSR and Russian signaling system. 
+
+Current version supports 1-, 2- and 3-lamp signals.
+
+:w20: width='20'
+[%header,cols="1h,2a,4*^a"]
+.1-lamp signal
+|===
+| Id | Description
+| image:1-r.png[] R
+| image:1-g.png[] G
+| image:1-y.png[] Y
+| image:1r-w.png[] W
+
+| 0 | off
+| image:1-gr.png[{w20}]
+| image:1-gr.png[{w20}]
+| image:1-gr.png[{w20}]
+| image:1r-gr.png[]
+
+| 1 | on
+| image:1-r.png[{w20}]
+| image:1-g.png[{w20}]
+| image:1-y.png[{w20}]
+| 
+
+| 2 | blink
+| 
+| 
+| 
+| image:1r-w(bl).png[]
+
+|===
+
+[%header,cols="1h,2a,4*^a"]
+.2-lamp signal
+|===
+| Id | Description
+| image:2-g-r.png[] GR
+| image:2-w-b.png[] WB
+| image:2-g-y.png[] GY
+| image:2h-r-r.png[] RR
+
+| 0 | all off
+| image:2-gr-gr.png[]
+| image:2-gr-gr.png[]
+| image:2-gr-gr.png[]
+| image:2h-gr-gr.png[]
+
+| 1 | 1st lamp on
+| image:2-g-gr.png[{w20}] 
+| image:2-w-gr.png[{w20}]
+| image:2-g-gr.png[{w20}]
+| 
+
+| 2 | 2nd lamp on
+| image:2-gr-r.png[{w20}] 
+| image:2-gr-b.png[{w20}]
+| image:2-gr-y.png[{w20}]
+| 
+
+| 3 | 1st lamp blink
+| image:2-g(bl)-gr.png[] 
+| image:2-w(bl)-gr.png[] 
+| image:2-g(bl)-gr.png[] 
+| 
+
+| 4 | alternating blink
+| | | | image:2h-r(bl)-r(bl).png[] 
+
+
+|===
+
+
+[%header,cols="1h,2a,3*^a"]
+.3-lamp signal
+|===
+| Id | Description
+| image:3-y-g-r.png[] YGR
+| image:3-y-r-g.png[] YRG
+| image:3h-r-w-r.png[] RYR
+
+| 0 | all off
+| image:3-gr-gr-gr.png[]
+| image:3-gr-gr-gr.png[]
+| image:3h-gr-gr-gr.png[]
+
+| 1 | 1st lamp on
+| image:3-y-gr-gr.png[] 
+| image:3-y-gr-gr.png[]
+| 
+
+| 2 | 2nd lamp on
+| image:3-gr-g-gr.png[] 
+| image:3-gr-r-gr.png[]
+| image:3h-gr-w-gr.png[]
+
+| 3 | 3rd lamp on
+| image:3-gr-gr-r.png[] 
+| image:3-gr-gr-g.png[]
+| 
+
+| 4 | 1st lamp blink
+| image:3-y(bl)-gr-gr.png[] 
+| image:3-y(bl)-gr-gr.png[]
+| 
+
+| 5 | 2nd lamp blink
+| image:3-gr-g(bl)-gr.png[] 
+| 
+| image:3h-gr-w(bl)-gr.png[]
+
+| 6 | 3rd lamp blink
+| 
+| image:3-gr-gr-g(bl).png[]
+| 
+
+| 7 | 1st and 3rd alternating blink
+| 
+| 
+| image:3h-r(bl)-gr-r(bl).png[]
+
+| 8 | 1st and 3rd lamps on
+| 
+| image:3-y-gr-g.png[]
+| 
+
+|===
+
 
 ### Configuration

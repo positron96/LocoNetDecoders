@@ -1,12 +1,12 @@
 #include <LocoNet.h>
 
-#include <Adafruit_PWMServoDriver.h>
+#include "SerialUtils.h"
+#include "MastManager.h"
+#include "PCA9685GPIO.h"
+#include "SerialReader.h"
 
-template<class T> inline Print &operator <<(Print &obj, T arg) { obj.print(arg); return obj; }
-template<class T> inline Print &operator <<=(Print &obj, T arg) { obj.println(arg); return obj; }
-
-
-constexpr int PIN_OE = 3;
+constexpr int PIN_OE = 4;
+constexpr int PIN_VEN = 3;
 
 constexpr int PIN_LED = 10;
 constexpr int PIN_BT = 2;
@@ -20,26 +20,14 @@ constexpr int ADDR_IN_COUNT = 8;
 constexpr bool INPUT_PULLUP_EN = true;
 constexpr int PIN_IN[ADDR_IN_COUNT] = {11, 12, A0, A1, A2, A3, 7, 6};
 
-Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver(0x40);
+using PCADriver = PCA9685GPIO<PIN_OE>;
+using TMastManager = MastManager<PCADriver::CH_OUT_COUNT/2, PCADriver>;
+TMastManager masts;
 
-LocoNetSystemVariableClass sv;
-
-constexpr uint16_t SV_ADDR_FADING = SV_ADDR_USER_BASE;
-constexpr uint16_t SV_ADDR_RESET = 255;//SV_ADDR_USER_BASE + 250;
-
-constexpr uint16_t DEFAULT_ADDR = 10;
-constexpr uint16_t DEFAULT_SERIAL = 0x0001;
-constexpr uint8_t ID_MANFR = 13; // DIY
-constexpr uint8_t ID_DEVLPR = 4;  
-constexpr uint8_t ID_PRODUCT = 2;
-constexpr uint8_t ID_SWVER = 1;
-
-uint16_t startOutAddr;
-uint16_t output;
-constexpr int CH_OUT_COUNT = 16;
-uint16_t maxOutputVals[CH_OUT_COUNT];
-
-bool fade;
+struct eeprom_cfg_t {
+    uint8_t ver;
+    uint16_t inAddr;
+} __attribute__((packed));
 
 uint16_t startInAddr;
 
@@ -56,95 +44,80 @@ constexpr int LED_INTL_NORMAL = 1000;
 constexpr int LED_INTL_CONFIG1 = 400;
 constexpr int LED_INTL_CONFIG2 = 150;
 
+constexpr int EEPROM_HEADER_SIZE = sizeof(eeprom_cfg_t);
+constexpr int EEPROM_OUTPUTS_START = EEPROM_HEADER_SIZE;
+constexpr int EEPROM_MASTS_START = EEPROM_OUTPUTS_START + PCADriver::EEPROM_REQUIRED;
+
+constexpr uint8_t EEPROM_VER = PCADriver::EEPROM_VER ^ TMastManager::EEPROM_VER ^ EEPROM_HEADER_SIZE;
+
 void ledFire(uint32_t, uint8_t);
 void ledStop();
-static void sendOutput(uint8_t ch, uint16_t val);
+//static void sendOutput(uint8_t ch, uint16_t val);
 
 void setup() {
     Serial.begin(115200);
-    Serial.println(F("LND-16L8I - LocoNet accessory decoder with 16 LEDs and 8 inputs"));
+    Serial.println(F("LND-L - LocoNet accessory decoder with 16 LEDs and 8 inputs"));
     
     pinMode(PIN_BT, INPUT);
     
     pinMode(PIN_LED, OUTPUT);
     ledFire(50,0);
 
-    pinMode(PIN_OE, OUTPUT);
-    digitalWrite(PIN_OE, HIGH); // disable LED driver    
-
     for(int i=0; i<ADDR_IN_COUNT; i++) {
         pinMode(PIN_IN[i], INPUT_PULLUP_EN ? INPUT_PULLUP : INPUT);
     }
-    
-    pwm.begin();
-    pwm.setPWMFreq(1600);
-    pwm.setOutputMode(false); // open drain
-    for(int i=0; i<CH_OUT_COUNT; i++) {
-        sendOutput(i, 0);
-        maxOutputVals[i] = 1024;
-    }
-    //maxOutputVals[1] = 128;
 
-    digitalWrite(PIN_OE, LOW); // enable LED driver
+    pinMode(PIN_VEN, OUTPUT);
+    digitalWrite(PIN_VEN, HIGH); // disable 5Vo
+    PCADriver::initHw();
+    digitalWrite(PIN_VEN, LOW); // enable 5Vo
+
+    static_assert( EEPROM_HEADER_SIZE + PCADriver::EEPROM_REQUIRED + TMastManager::EEPROM_REQUIRED < E2END, 
+        "EEPROM size exceeded");
+    eeprom_cfg_t cc;
+    EEPROM.get<eeprom_cfg_t>(0, cc);
+    if(cc.ver == EEPROM_VER) {
+        startInAddr = cc.inAddr;  
+        PCADriver::load(EEPROM_OUTPUTS_START);
+        masts.load(EEPROM_MASTS_START);
+    } else {
+        Serial<<=F("Bad EEPROM, loading default values");
+        startInAddr = 10;
+        PCADriver::reset();
+        masts.reset();
+        save();
+    } 
     
     
     LocoNet.init(PIN_TX);  
 
-    sv.init(ID_MANFR, ID_DEVLPR, ID_PRODUCT, ID_SWVER);
-    uint16_t serial = 
-          sv.readSVStorage(SV_ADDR_SERIAL_NUMBER_H)<<8 
-        | sv.readSVStorage(SV_ADDR_SERIAL_NUMBER_L);
-
-    if(serial != DEFAULT_SERIAL) {  
-        Serial.println(F("Writing factory defaults") );
-        sv.writeSVStorage(SV_ADDR_SERIAL_NUMBER_H, DEFAULT_SERIAL>>8);
-        sv.writeSVStorage(SV_ADDR_SERIAL_NUMBER_L, DEFAULT_SERIAL & 0xFF);
-        sv.writeSVNodeId(DEFAULT_ADDR);
-    }
-
-    startOutAddr = sv.readSVNodeId(); 
-    startInAddr = startOutAddr;
-    fade = sv.readSVStorage(SV_ADDR_FADING) != 0;
-    
-    Serial<< F("Output start address is ") <<= startOutAddr;
     Serial<< F("Input start address is ") <<= startInAddr;
-    Serial<< F("Fade is ") <<= fade?"On":"Off";
-
+    listMasts();
     Serial<<= F("Init done");
 }
 
-int hex2int(char ch) {
+void save() {
+    eeprom_cfg_t cc{ .ver=EEPROM_VER, .inAddr=startInAddr };
+
+    EEPROM.put<eeprom_cfg_t>(0, cc);;
+    PCADriver::save(EEPROM_OUTPUTS_START);
+    masts.save(EEPROM_MASTS_START);
+}
+
+void listMasts() {
+    int i=0; 
+    Serial<<F("Masts count: ")<<=masts.size();
+    for(const auto &m: masts.getMasts() ) {
+        Serial<<F("Mast ")<<i<<F("; addr=")<<m.busAddr()<<F("; channel=")<<=m.ch;
+        i++;
+    }
+}
+
+int hex2int(const char ch) {
     if (ch >= '0' && ch <= '9') return ch - '0';
     if (ch >= 'A' && ch <= 'F') return ch - 'A' + 10;
     if (ch >= 'a' && ch <= 'f') return ch - 'a' + 10;
     return -1;
-}
-
-constexpr uint32_t TRANS_TIME = 100; // ms
-constexpr uint8_t RES = 8;
-
-static inline void sendOutput(uint8_t ch, uint16_t val) {
-    pwm.setPin(ch, val, true);
-}
-
-void changeOutput(uint8_t ch, uint8_t val) {
-    if(bitRead(output, ch)==val)  return;
-
-    Serial<<F("Setting channel ")<<ch<<F(" to ")<<=val;
-
-    int16_t dst = val * maxOutputVals[ch];
-    if(fade) {
-        int16_t src = (dst==0)?maxOutputVals[ch] : 0;
-        //Serial.println(String("src=")+src+"; dst="+dst);
-        for(uint8_t i=0; i<RES; i++) {
-            uint16_t t = src + (dst-src)*i/RES;
-            sendOutput(ch, t);
-            delay(TRANS_TIME/RES);
-        }
-    }
-    bitWrite(output, ch, val);
-    sendOutput(ch, dst);
-    reportChannelState(ch);
 }
 
 void ledFire(uint32_t ms, uint8_t val=1) {
@@ -168,7 +141,7 @@ void checkButton() {
     if(bt==1 && lastBt==0) {
         //Serial.println("Button down");
         btPressTime = millis();
-        if(configMode) Serial.println("Quitting config mode");
+        if(configMode) Serial<<=F("Quitting config mode");
         configMode=false;
         delay(5); // simple debounce
         ledStop();
@@ -177,7 +150,7 @@ void checkButton() {
         if(millis()-btPressTime>BUTTON_LONG_PRESS_DURATION && !configMode) { 
             configMode=true;
             configVar=0;
-            Serial.println("Entering config mode");
+            Serial<<=F("Entering config mode");
             ledOn(); // start blink again
         }
     }
@@ -208,10 +181,10 @@ void checkInputs() {
             if(lastIns[i] == in) {
                 // in = jitter-free value
                 uint16_t inAddr = startInAddr+i;
-                Serial<<F("Input ")<<i<<"(addr "<<inAddr<<F(") changed to ")<<=in;
+                Serial<<F("Input ")<<i<<F("(addr ")<<inAddr<<F(") changed to ")<<=in;
                 ledFire(100);
                 LocoNet.reportSensor(inAddr, in);
-            } 
+            }
             lastIns[i] = in;
             primeTime[i] = 0;
         }
@@ -227,7 +200,7 @@ void checkInputs() {
 void processImmPacket(sendPktMsg &m) {
     if(m.val7f != 0x7F) return;
     uint8_t len = (m.reps & 0b01110000)>> 4;
-    Serial<<"Imm packet of len "<<=len;
+    //Serial<<F("Imm packet of len ")<<=len;
     if(len!=3) return;
     uint8_t d[3] = { m.im1, m.im2, m.im3 };
     for(uint8_t i=0; i<3; i++) {
@@ -238,38 +211,27 @@ void processImmPacket(sendPktMsg &m) {
                   | ( d[1] & 0b110)>>1  // low
                   | (~d[1] & 0b01110000)<<(8-4) // high
                   ) + 1;
-    Serial<<"Imm address = "<<=addr;
-    if(addr>=startOutAddr && addr<=startOutAddr+ADDR_OUT_COUNT) {
-        uint8_t aspect = d[2]; 
-        Serial<<"aspect="<<=aspect;
-        ledFire(100);
+    Serial<<F("Imm address = ")<<=addr;
+    uint8_t aspect = d[2]; 
+    Serial<<F("aspect=")<<=aspect;
+    ledFire(100);
+    int16_t idx = masts.findAddr(addr);
+    if(idx>=0)
+        masts.setAspect(idx, aspect);
 
-        uint8_t ch = (addr-startOutAddr)*4 + aspect; 
-        uint8_t val = 1;
-        changeOutput(ch, val);    
-    }
 }
 
 void loop() {
-    static bool deferredProcessingNeeded = false;
 
     lnMsg *msg = LocoNet.receive() ;
     if ( msg!=nullptr ) {
 
         if(msg->data[0] == OPC_IMM_PACKET) {
             processImmPacket(msg->sp);
-                        
-        } else
-        if (!LocoNet.processSwitchSensorMessage(msg)) {
-            SV_STATUS svStatus = sv.processMessage(msg);
-            Serial<<F("LNSV processMessage - Status: ")<<=svStatus;
-            deferredProcessingNeeded = (svStatus == SV_DEFERRED_PROCESSING_NEEDED);
+        } else if (!LocoNet.processSwitchSensorMessage(msg)) {
         } else {
         }
     }
-
-    if(deferredProcessingNeeded)
-        deferredProcessingNeeded = (sv.doDeferredProcessing() != SV_OK);
 
     checkButton();
 
@@ -287,6 +249,8 @@ void loop() {
         ledNextUpdate += millis();
     }
 
+    masts.tick();
+
     /*
     static long nextInRead = 0;
     static int lastV=0;
@@ -300,68 +264,77 @@ void loop() {
     }
     */
 
-    
-    if (Serial.available()>0) {
-        int t = Serial.read();
-        switch(t) {
+    static SerialReader ser;
+    static mast_idx_t cmast=0;
 
-            case 'h':
-                Serial.println("HIGH");
-                digitalWrite(PIN_OE, HIGH); // disable LED driver    
-                break;
-            case 'l':
-                Serial.println("LOW");
-                digitalWrite(PIN_OE, LOW);     
-                break;
-            case 'o':
-                Serial.println("OUT");
-                pinMode(PIN_OE, OUTPUT);
-                break;
-            case 'i':
-                Serial.println("IN");
-                pinMode(PIN_OE, INPUT);
-                break;
-            case ' ':
-                changeOutput(0, 1-bitRead(output, 0));    
-                break;
-            default:
-                uint8_t ch = hex2int(t);
-                if(ch>=0 && ch<16) {
-                    changeOutput(ch, 1-bitRead(output, ch));    
-                }
-                break;
-        }        
-        
-        
-    }
+    if(ser.checkSerial(Serial)) {
+        char* cmd = ser.bufPart(0);
+        if(strlen(cmd)==1) {
+            int aspect = hex2int(cmd[0]);
+            if(aspect>=0 && aspect < masts.getMasts()[cmast].getAspectCount() ) {
+                masts.setAspect(cmast, aspect);
+                Serial<<F("Set mast ")<<cmast<<':'<<=aspect;
+            } else { Serial<<F("Bad aspect: ")<<=aspect;}
+        } else
+        if(strcmp(cmd, "mast")==0) {
+            cmast = atoi(ser.bufPart(1));
+            Serial<<F("Current mast idx ")<<=cmast;
+        } else 
+        if(strcmp(cmd, "addmast")==0) {
+            int nh = atoi(ser.bufPart(1));
+            int addr = atoi(ser.bufPart(2));
+            masts.addMast(addr, nh);
+            Serial<<F("Added mast addr=")<<addr<<F("; heads=")<<=nh;
+        } else
+        if(strcmp(cmd, "delmast")==0) {
+            masts.deleteLastMast();
+            Serial<<=F("Deleted last mast");
+        } else
+        if(strcmp(cmd, "clearmasts")==0) {
+            masts.reset();
+            Serial<<=F("Deleted all masts");
+        } else
+        if(strcmp(cmd, "listmasts")==0) {
+            listMasts();
+        } else
+        if(strcmp(cmd, "br")==0) {
+            PCADriver::channel_t ch = atoi(ser.bufPart(1));
+            uint16_t mx = atoi(ser.bufPart(2));
+            PCADriver::setMaxPWM( ch, mx );
+            Serial<<F("Set max PWM for channel ")<<ch<<':'<<=mx;
+        } else
+        if(strcmp(cmd, "reset")==0) {
+            Serial<<=F("Loading defaults");
+            PCADriver::reset();
+            masts.reset();
+        } else 
+        if(strcmp(cmd, "save")==0) {
+            Serial<<=F("Saving to EEPROM");
+            save();
+        } else
 
-    /*
-     
-    static long nextUpdate = millis();
-    if(millis()> nextUpdate ) {
-        for(int i=0; i<16; i++) {
-            if(h2[i]<led_pwm[i]) {
-                bitSet(output, i);
-                h2[i] += P-led_pwm[i];
-            } else {
-                bitClear(output, i);
-                h2[i] -= led_pwm[i];
+        if(strcmp(cmd, "off")==0) {
+            Serial<<=F("All masts off");
+            for(auto& m: masts.getMasts() ) {
+                m.setAspect(0);
             }
-        }
-        //Serial.println(String("i=0")+" pwm="+led_pwm[0]+" h2="+h2[0]);
-        digitalWrite(PIN_LE, LOW);
-        SPI.transfer16( output ); 
-        digitalWrite(PIN_LE, HIGH);
-        nextUpdate = millis()+1;
+        } else 
+        if(strcmp(cmd, "ch")==0)  {
+            int ch = atoi(ser.bufPart(1));
+            int v = atoi(ser.bufPart(2));
+            Serial<<F("Setting ch ")<<ch<<F(" to ")<<=v;
+            PCADriver::set(ch, v!=0);
+        } else 
+
+        if(strcmp(cmd, "inaddr")==0) {
+            int addr = atoi(ser.bufPart(1));
+            Serial<<F("Input start address set to ")<<=addr;
+            startInAddr = addr;
+        } else
+
+        Serial<<=F("Unknown command");
+
     }
-    */
-    /*for (int channel = 0; channel < 16; channel++) {
-        digitalWrite(PIN_LE, LOW);
-        SPI.transfer16( (uint16_t) (1 << channel) ); 
-        digitalWrite(PIN_LE, HIGH);
-        delay(250);
-        Serial.println( (uint16_t)1<<channel, BIN);
-    }*/
 
 }
 
@@ -373,44 +346,39 @@ void notifySwitchRequest( uint16_t addr, uint8_t out, uint8_t dir ) {
     bool on = out!=0;
     bool thrown = dir==0;
     
-    Serial.print("Switch Request: ");
-    Serial.print(addr, DEC);
-    Serial.print(':');
-    Serial.print(dir ? "Closed" : "Thrown");
-    Serial.print(" - ");
-    Serial.println(out ? "On" : "Off");
+    Serial<<F("Switch Request: ")<<addr<<':'<< (dir?'C':'T') << ':' <<= (out?'+':'-');
 
     if(!on) return;
 
     if(!configMode) {
-        if(addr >= startOutAddr && addr<startOutAddr+ADDR_OUT_COUNT) {
-            ledFire(100);
-
-            uint8_t ch = (addr-startOutAddr); // requested pin
-            uint8_t val = thrown?1:0;
-            changeOutput(ch, val);    
+        for(auto &m: masts.getMasts() ) {
+            if(addr >= m.busAddr() && addr<m.busAddr() + m.getAspectCount() ) {
+                ledFire(100);
+                m.setAspect(addr-m.busAddr());
+            }
         }
         return;
-    }
+    } else {
 
-    // set addr
-    if(thrown) {
-        if(configVar==0) {
-            configVar = addr;
-            Serial.print("Var=");
-            Serial.println(configVar);
-        } else {
-            startOutAddr = addr;
-            //sv.writeSvNodeId(startOut);
-            Serial.print("Changed start address to ");
-            Serial.println(startOutAddr);
-            configVar = 0;
+        // set addr
+        if(thrown) {
+            if(configVar==0) {
+                configVar = addr;
+                Serial<<F("Selected var ")<<=configVar;
+            } else {
+                //startOutAddr = addr;
+                //sv.writeSvNodeId(startOut);
+                //Serial.print(F("Changed start address to "));
+                //Serial.println(startOutAddr);
+                configVar = 0;
+            }
+            ledFire(2000);
         }
-        ledFire(2000);
     }
 
 }
 
+/*
 void reportChannelState(uint8_t ch) {
     uint16_t addr = startOutAddr+ch;
     addr -= 1;
@@ -421,21 +389,5 @@ void reportChannelState(uint8_t ch) {
         |  (bitRead(output,ch) ? OPC_SW_REP_THROWN: OPC_SW_REP_CLOSED)  ;
     LocoNet.send(&txMsg);
 }
+*/
 
-
-void notifySVChanged(uint16_t offs){
-    Serial.print("notifySVChanged: SV");
-    Serial.print(offs);
-    Serial.print("->");
-    Serial.println(sv.readSVStorage(offs));
-    switch(offs) {
-        case SV_ADDR_RESET: 
-            // this will factory reset on reset
-            sv.writeSVStorage(SV_ADDR_SERIAL_NUMBER_H, 10); 
-            sv.writeSVStorage(SV_ADDR_RESET, 0); 
-            break;
-        case SV_ADDR_FADING:
-            fade = sv.readSVStorage(SV_ADDR_FADING)!=0;
-            break;   
-    }
-}
