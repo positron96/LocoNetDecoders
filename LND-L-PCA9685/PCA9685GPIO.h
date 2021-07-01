@@ -34,7 +34,7 @@ public:
     
     }
 
-    static constexpr uint8_t EEPROM_VER = 1+CH_OUT_COUNT;
+    static constexpr uint8_t EEPROM_VER = 1^CH_OUT_COUNT;
     static constexpr int EEPROM_REQUIRED = CH_OUT_COUNT*2;
     static bool load(int eepromAddr) {
         for(channel_t i=0; i<CH_OUT_COUNT; i++) {
