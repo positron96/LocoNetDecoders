@@ -85,7 +85,7 @@ void setup() {
         startInAddr = 10;
         PCADriver::reset();
         masts.reset();
-        save();
+        //save();
     } 
     
     
@@ -108,7 +108,7 @@ void listMasts() {
     int i=0; 
     Serial<<F("Masts count: ")<<=masts.size();
     for(const auto &m: masts.getMasts() ) {
-        Serial<<F("Mast ")<<i<<F("; addr=")<<m.busAddr()<<F("; channel=")<<=m.ch;
+        Serial<<F("Mast ")<<i<<F(" addr:")<<m.busAddr()<<F(" channel:")<<m.ch<<F(" aspect:")<<=m.getAspect();
         i++;
     }
 }
