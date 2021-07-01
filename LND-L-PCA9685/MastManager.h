@@ -22,37 +22,37 @@ template<class OutputDriver>
 class Mast {
 public:
     struct info_t {
-        uint16_t addr:11;
-        uint8_t nheads:3;
+        uint16_t addr;
+        uint8_t nheads:3; // up to 8 heads
+        uint8_t curAspect:5; // up to 32 aspects
     };
 
     using ch_t = typename OutputDriver::channel_t;
     info_t info;
     ch_t ch;
-    uint8_t curAspect;
     uint32_t lastChangeTime;
 
     static constexpr int EEPROM_REQUIRED = sizeof(info_t);
 
 public:
     Mast(uint16_t busAddress, ch_t outputChannel, uint8_t nheads)
-        : info{busAddress,nheads}, ch(outputChannel), curAspect(0), lastChangeTime(0)
-
+        : info{busAddress,nheads,0}, ch(outputChannel), lastChangeTime(0)
     {
 
     }
 
     Mast(int &eepromaddr, ch_t &startCh):
-        ch(startCh), curAspect(0), lastChangeTime(0) 
+        ch(startCh), lastChangeTime(0) 
     {
         EEPROM.get<info_t>(eepromaddr, info);
         eepromaddr += EEPROM_REQUIRED;
         startCh += nheads();
+        setAspect(info.curAspect, true);
     }
 
     void save(int &eepromAddr) const {
         EEPROM.put<info_t>(eepromAddr, info);
-        eepromAddr += 2;
+        eepromAddr += EEPROM_REQUIRED;
     }
 
     uint8_t nheads() const {
@@ -63,9 +63,9 @@ public:
         return info.addr;
     }
 
-    void setAspect(uint8_t aspect) {
-        if(curAspect==aspect) return;
-        curAspect = aspect;
+    void setAspect(uint8_t aspect, bool force=false) {
+        if(info.curAspect==aspect && !force) return;
+        info.curAspect = aspect;
         lastChangeTime = 0;
         switch(nheads() ) {
             case 1: set1head(); break;
@@ -74,7 +74,7 @@ public:
         }
     }
 
-    uint8_t getAspect() const { return curAspect; }
+    uint8_t getAspect() const { return info.curAspect; }
 
     void tick() {
         if(lastChangeTime==0) return;
@@ -97,7 +97,7 @@ public:
 private:
 
     void set1head() {
-        switch(curAspect) {
+        switch(info.curAspect) {
             case 0: OutputDriver::set(ch, 0); break;
             case 2:
                 lastChangeTime = millis();
@@ -109,7 +109,7 @@ private:
 
     void tick1head() {
         if(millis() - lastChangeTime > BLINK_DUR) {
-            if(curAspect==2) {
+            if(info.curAspect==2) {
                 OutputDriver::toggle(ch);
                 lastChangeTime = millis();
             }
@@ -118,7 +118,7 @@ private:
 
 
     void set2head() {
-        switch(curAspect) {
+        switch(info.curAspect) {
             case 0: 
                 OutputDriver::template setn<2>(ch, false, 0,1); 
                 break;
@@ -138,7 +138,7 @@ private:
 
     void tick2head() {
         if(millis() - lastChangeTime > BLINK_DUR) {
-            switch(curAspect) {
+            switch(info.curAspect) {
             case 3:
                 OutputDriver::toggle(ch);
                 break;
@@ -159,7 +159,7 @@ private:
 
 
     void set3head() {
-        switch(curAspect) {
+        switch(info.curAspect) {
             case 0: {
                 OutputDriver::template setn<3>(ch, false, 0,1,2);
                 break;
@@ -197,7 +197,7 @@ private:
 
     void tick3head() {
         if(millis() - lastChangeTime > BLINK_DUR) {
-            switch(curAspect) {
+            switch(info.curAspect) {
                 case 4:
                     OutputDriver::toggle(ch);
                     break;
