@@ -70,20 +70,24 @@ public:
     static constexpr uint8_t MAX_CH = 3;
 
     template<uint8_t N, typename... Offsets, 
-        etl::enable_if_t<sizeof...(Offsets) == N, int> = 0,
-        etl::enable_if_t<etl::are_all_same<int, Offsets...>::value, int> = 0,
-        etl::enable_if_t<N<=MAX_CH, int> = 0 >
-    static void setn(const channel_t ch0, bool val, const Offsets... ofs_) {
+        etl::enable_if_t<sizeof...(Offsets) == N, bool> = true,
+        etl::enable_if_t<etl::are_all_same<int, Offsets...>::value, bool> = true,
+        etl::enable_if_t<N<=MAX_CH, bool> = true >
+    static void setn(const channel_t ch0, const bool val, const Offsets... ofs_) {
         const channel_t ch[] = { channel_t(ch0+ofs_)... };
+        set_arr(ch, N, val);
+    }
+
+    static void set_arr(const channel_t* ch, const uint8_t N, const bool val) {
         bool allgood = true;
         for(uint8_t i=0; i<N; i++) if(get(ch[i])!=val) allgood = false;
         if(allgood) return;
 
-        int16_t dst[N];
+        int16_t dst[MAX_CH];
         for(uint8_t i=0; i<N; i++) dst[i] = val ? maxPWM12(ch[i]) : 0;
 
         if(states[ch[0]].fade) {
-            int16_t src[N];
+            int16_t src[MAX_CH];
 
             for(uint8_t i=0; i<N; i++) src[i] = get(ch[i]) ? maxPWM12(ch[i]) : 0;
             for(uint8_t step=0; step<RES; step++) {
