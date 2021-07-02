@@ -12,6 +12,10 @@ public:
     using channel_t = uint8_t;
     constexpr static channel_t CH_OUT_COUNT = 16;
 
+    using effect_t = uint8_t;
+    static constexpr effect_t EFFECT_FADE = 1;
+    static constexpr effect_t EFFECT_FLUORESCENT_LAMP = 2; 
+
     static void initHw() {
         //pwm = PCA9685Driver(0x40);
         
@@ -39,31 +43,26 @@ public:
     static bool load(int eepromAddr) {
         for(channel_t i=0; i<CH_OUT_COUNT; i++) {
             EEPROM.get<uint8_t>(eepromAddr, states[i].maxPWM);
-            uint8_t f;
-            EEPROM.get<uint8_t>(eepromAddr+1, f);
-            states[i].fade = f!=0;
-            eepromAddr+=2;
+            eepromAddr+=1;
         }
         return true;
     }
     static void reset() {
         for(channel_t ch=0; ch<CH_OUT_COUNT; ch++) {
             states[ch].maxPWM = 32;
-            states[ch].fade = true;
             states[ch].curVal = false;
         }
     }
     static bool save(int eepromAddr) {
         for(channel_t i=0; i<CH_OUT_COUNT; i++) {
             EEPROM.put<uint8_t>(eepromAddr, states[i].maxPWM);
-            EEPROM.put<uint8_t>(eepromAddr+1, states[i].fade ? 255 : 0);
-            eepromAddr+=2;
+            eepromAddr+=1;
         }
         return true;
     }
 
-    static void set(channel_t ch, bool val) {
-        setn<1>(ch, val, 0);
+    static void set(channel_t ch, bool val, effect_t eff=0) {
+        setn<1>(ch, val, eff, 0);
     }
 
 
@@ -73,12 +72,12 @@ public:
         etl::enable_if_t<sizeof...(Offsets) == N, bool> = true,
         etl::enable_if_t<etl::are_all_same<int, Offsets...>::value, bool> = true,
         etl::enable_if_t<N<=MAX_CH, bool> = true >
-    static void setn(const channel_t ch0, const bool val, const Offsets... ofs_) {
+    static void setn(const channel_t ch0, const bool val, const effect_t eff, const Offsets... ofs_) {
         const channel_t ch[] = { channel_t(ch0+ofs_)... };
         set_arr(ch, N, val);
     }
 
-    static void set_arr(const channel_t* ch, const uint8_t N, const bool val) {
+    static void set_arr(const channel_t* ch, const uint8_t N, const bool val, const effect_t eff=0) {
         bool allgood = true;
         for(uint8_t i=0; i<N; i++) if(get(ch[i])!=val) allgood = false;
         if(allgood) return;
@@ -86,7 +85,7 @@ public:
         int16_t dst[MAX_CH];
         for(uint8_t i=0; i<N; i++) dst[i] = val ? maxPWM12(ch[i]) : 0;
 
-        if(states[ch[0]].fade) {
+        if(eff==EFFECT_FADE) {
             int16_t src[MAX_CH];
 
             for(uint8_t i=0; i<N; i++) src[i] = get(ch[i]) ? maxPWM12(ch[i]) : 0;
@@ -96,6 +95,15 @@ public:
                     pwm.setPWM(ch[i], t);
                 }
                 delay(TRANS_TIME/RES);
+            }
+        } else
+        if(eff==EFFECT_FLUORESCENT_LAMP) {
+            for(uint8_t step=1; step<=4; step++) {
+                int t = 5 + (rand() % 10);
+                delay(step*t);
+                pwm.setPWM(ch[0], dst[0]);
+                t = rand() % 100;
+                delay(step*t);)
             }
         }
         for(uint8_t i=0; i<N; i++) {
@@ -108,8 +116,8 @@ public:
         return states[ch].curVal;
     }
 
-    static void toggle(channel_t pin) {
-        set(pin, !get(pin)); 
+    static void toggle(channel_t pin, effect_t eff=0) {
+        set(pin, !get(pin), eff); 
     }
 
     static void setMaxPWM(channel_t ch, uint8_t mx) {
@@ -121,7 +129,6 @@ private:
     struct state_t {
         uint8_t maxPWM;///< divided by 16 (actual max is 12bits) 
         bool curVal:1;
-        bool fade:1;
     } __attribute__((packed));
 
     static PCA9685Driver pwm;

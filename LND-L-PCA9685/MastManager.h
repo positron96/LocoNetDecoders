@@ -24,9 +24,11 @@ public:
     struct info_t {
         uint16_t addr:11;
         uint8_t nheads:3;
-    };
+        uint8_t effect:2;
+    } __attribute__((packed));
 
     using ch_t = typename OutputDriver::channel_t;
+    using eff_t = typename OutputDriver::effect_t;
     info_t info;
     ch_t ch;
     uint8_t curAspect;
@@ -34,25 +36,24 @@ public:
 
     static constexpr int EEPROM_REQUIRED = sizeof(info_t);
 
-public:
-    Mast(uint16_t busAddress, ch_t outputChannel, uint8_t nheads)
-        : info{busAddress,nheads}, ch(outputChannel), curAspect(0), lastChangeTime(0)
 
+    Mast(uint16_t busAddress, ch_t outputChannel, uint8_t nheads, eff_t eff=1)
+        : info{busAddress,nheads,eff}, ch(outputChannel), curAspect(0), lastChangeTime(0)
     {
 
     }
 
-    Mast(int &eepromaddr, ch_t &startCh):
+    Mast(int &eepromAddr, ch_t &startCh):
         ch(startCh), curAspect(0), lastChangeTime(0) 
     {
-        EEPROM.get<info_t>(eepromaddr, info);
-        eepromaddr += EEPROM_REQUIRED;
+        EEPROM.get<info_t>(eepromAddr, info);
+        eepromAddr += EEPROM_REQUIRED;
         startCh += nheads();
     }
 
     void save(int &eepromAddr) const {
         EEPROM.put<info_t>(eepromAddr, info);
-        eepromAddr += 2;
+        eepromAddr += EEPROM_REQUIRED;
     }
 
     uint8_t nheads() const {
@@ -98,11 +99,10 @@ private:
 
     void set1head() {
         switch(curAspect) {
-            case 0: OutputDriver::set(ch, 0); break;
+            case 0: OutputDriver::set(ch, 0, info.effect); break;
             case 2:
                 lastChangeTime = millis();
-            case 1: OutputDriver::set(ch, 1); break;
-            
+            case 1: OutputDriver::set(ch, 1, info.effect); break;            
         }
         
     }
@@ -110,7 +110,7 @@ private:
     void tick1head() {
         if(millis() - lastChangeTime > BLINK_DUR) {
             if(curAspect==2) {
-                OutputDriver::toggle(ch);
+                OutputDriver::toggle(ch, info.effect);
                 lastChangeTime = millis();
             }
         }
@@ -120,18 +120,18 @@ private:
     void set2head() {
         switch(curAspect) {
             case 0: 
-                OutputDriver::template setn<2>(ch, false, 0,1); 
+                OutputDriver::template setn<2>(ch, false, info.effect, 0,1); 
                 break;
             case 3:
             case 4: 
                 lastChangeTime = millis();
             case 1: 
-                OutputDriver::set(ch+1, 0); 
-                OutputDriver::set(ch, 1); 
+                OutputDriver::set(ch+1, false, info.effect); 
+                OutputDriver::set(ch, true, info.effect); 
                 break;
             case 2:
-                OutputDriver::set(ch, 0); 
-                OutputDriver::set(ch+1, 1); 
+                OutputDriver::set(ch, 0, info.effect); 
+                OutputDriver::set(ch+1, 1, info.effect); 
                 break;
         }
     }
@@ -140,15 +140,15 @@ private:
         if(millis() - lastChangeTime > BLINK_DUR) {
             switch(curAspect) {
             case 3:
-                OutputDriver::toggle(ch);
+                OutputDriver::toggle(ch, info.effect);
                 break;
             case 4:
                 if(OutputDriver::get(ch)) {
-                    OutputDriver::set(ch+1, 1);
-                    OutputDriver::set(ch, 0);
+                    OutputDriver::set(ch+1, true, info.effect);
+                    OutputDriver::set(ch, false, info.effect);
                 } else {
-                    OutputDriver::set(ch, 1);
-                    OutputDriver::set(ch+1, 0);
+                    OutputDriver::set(ch, true, info.effect);
+                    OutputDriver::set(ch+1, false, info.effect);
                 }
                 break;
             }
@@ -161,36 +161,36 @@ private:
     void set3head() {
         switch(curAspect) {
             case 0: {
-                OutputDriver::template setn<3>(ch, false, 0,1,2);
+                OutputDriver::template setn<3>(ch, false, info.effect, 0,1,2);
                 break;
             }
             case 4:
                 lastChangeTime = millis();
             case 1:
-                OutputDriver::template setn<2>(ch, false, 1,2); 
+                OutputDriver::template setn<2>(ch, false, info.effect, 1,2); 
                 OutputDriver::set(ch, true); 
                 break;
             case 5: 
                 lastChangeTime = millis();
             case 2:
-                OutputDriver::template setn<2>(ch, false, 0,2); 
-                OutputDriver::set(ch+1, true); 
+                OutputDriver::template setn<2>(ch, false,  info.effect, 0,2); 
+                OutputDriver::set(ch+1, true, info.effect); 
                 break;
             case 6:
                 lastChangeTime = millis();
             case 3:
-                OutputDriver::template setn<2>(ch, false, 0,1); 
-                OutputDriver::set(ch+2, true); 
+                OutputDriver::template setn<2>(ch, false, info.effect, 0,1); 
+                OutputDriver::set(ch+2, true, info.effect); 
                 break;
             case 7:
                 lastChangeTime = millis();
-                OutputDriver::template setn<2>(ch, false, 1,2); 
-                OutputDriver::set(ch, true); 
+                OutputDriver::template setn<2>(ch, false, info.effect, 1,2); 
+                OutputDriver::set(ch, true, info.effect); 
                 break;
             case 8:
                 lastChangeTime = millis();
-                OutputDriver::set(ch+1, false); 
-                OutputDriver::template setn<2>(ch, true, 0,2); 
+                OutputDriver::set(ch+1, false, info.effect); 
+                OutputDriver::template setn<2>(ch, true, info.effect, 0,2); 
                 break;
         }
     }
@@ -199,21 +199,21 @@ private:
         if(millis() - lastChangeTime > BLINK_DUR) {
             switch(curAspect) {
                 case 4:
-                    OutputDriver::toggle(ch);
+                    OutputDriver::toggle(ch, info.effect);
                     break;
                 case 5:
-                    OutputDriver::toggle(ch+1);
+                    OutputDriver::toggle(ch+1, info.effect);
                     break;
                 case 6: 
-                    OutputDriver::toggle(ch+2); 
+                    OutputDriver::toggle(ch+2, info.effect); 
                     break;
                 case 7:
                     if(OutputDriver::get(ch)) {
-                        OutputDriver::set(ch+2, 1);
-                        OutputDriver::set(ch, 0);
+                        OutputDriver::set(ch+2, true, info.effect);
+                        OutputDriver::set(ch, false, info.effect);
                     } else {
-                        OutputDriver::set(ch, 1);
-                        OutputDriver::set(ch+2, 0);
+                        OutputDriver::set(ch, true, info.effect);
+                        OutputDriver::set(ch+2, false, info.effect);
                     }
                     break;
             }
@@ -251,13 +251,13 @@ public:
         return masts[idx].getAspect();
     }
 
-    bool addMast(uint16_t busAddr, uint8_t nheads) {
+    bool addMast(uint16_t busAddr, uint8_t nheads, uint8_t effect) {
         ch_t ch=0;
         if(masts.size()>0) {
             const TMast &last = masts.back();
             ch = last.ch + last.nheads();
         }
-        masts.push_back( TMast{busAddr, ch, nheads} ) ;
+        masts.push_back( TMast{busAddr, ch, nheads, effect} ) ;
         return true;
     }
 

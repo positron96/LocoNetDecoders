@@ -45,7 +45,7 @@ private:
     char buf[BUF_SIZE+1];
     uint8_t bufLen;
 
-    static constexpr uint8_t MAX_PARTS = 3;
+    static constexpr uint8_t MAX_PARTS = 4;
     char* parts[MAX_PARTS]; // command of at most 3 parts
     uint8_t nParts;
 

@@ -281,10 +281,12 @@ void loop() {
             Serial<<F("Current mast idx ")<<=cmast;
         } else 
         if(strcmp(cmd, "addmast")==0) {
-            int nh = atoi(ser.bufPart(1));
-            int addr = atoi(ser.bufPart(2));
-            masts.addMast(addr, nh);
-            Serial<<F("Added mast addr=")<<addr<<F("; heads=")<<=nh;
+            uint8_t nh = atoi(ser.bufPart(1));
+            uint16_t addr = atoi(ser.bufPart(2));
+            uint8_t eff = 1;
+            if(ser.bufParts()==4) eff = atoi(ser.bufPart(3));
+            masts.addMast(addr, nh, eff);
+            Serial<<F("Added mast addr=")<<addr<<F("; heads=")<<nh<<"; effect="<<=eff;
         } else
         if(strcmp(cmd, "delmast")==0) {
             masts.deleteLastMast();
