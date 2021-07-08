@@ -1,0 +1,38 @@
+# Configuration 
+
+[%header,cols="1h,4a"]
+.Available configuration variables
+|===
+| Var | Meaning (__Default value__)
+| 1  | Address of first turnout. (__6__)
+| 7  | Duration of pulse, in ms. Max: 255. (__10__) 
+| 8  | Pulse count for each open/close action. Recommended<5, max 255 [1]. (default: __1__)
+|===
+[1] The decoder does not process new messages while it is doing pulses, so too many pulses for one turnout may delay or disrupt operation of next turnout.
+
+The decoder can be configured in 2 ways:
+
+## Using throttle
+
+. Connect a throttle and decoder to command station. 
+Command station is not needed for communication, but something needs to power the LocoNet bus, decoder and throttle.
+
+. Hold button (marked BT1) on the decoder for 3s (when you press the button, the blinking LED (marked LED1) on the board will turn off. After 3 seconds, it will start blinking fast with 0.4s interval to make it easier to decide when to release the button).
+
+. While the LED is blinking fast, the decoder is expecting variable number to be input with a throttle. To change variable with number N, simply throw a turnout with address N. After that, the LED will start blinking even faster (0.15s interval).
+
+. While the LED is blinking faster, the decoder is expecting variable value to be input with a throttle. Again, to set var value to M, just throw a turnout with address M. The decoder will store the new value in EEPROM and LED will start blinking normally. 
+
+**TL;DR:**
+To set variable 1 to 20: go to config mode via long button press, throw turnout 1, throw turnout 20. Watch the LED for hints.
+
+To change another value, start procedure from pt. 1.
+
+If new settings are not working, reset the board with a reset button on the Arduino and file an issue.
+
+## Using SVs
+
+TODO.
+
+The decoder accepts LocoNet System Variable (SVs) messages.
+You can read and write SVs with JMRI, but decoder XML definition for JMRI is not created yet.
