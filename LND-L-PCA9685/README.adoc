@@ -2,9 +2,13 @@
 
 ## LND-L-PCA9685 - A 16 LED LocoNet decoder
 
+
+image:https://img.youtube.com/vi/hhKzCz2ck-I/mqdefault.jpg[link=https://www.youtube.com/watch?v=hhKzCz2ck-I]
+
+
 This is a firmware for LocoNet-only accessory decoder for 16 LEDs.
 
-PCA9685 board (or bare IC) is used to controll LEDs. 
+PCA9685 module (or bare IC) is used to controll LEDs. 
 Theoretically, 62 PCA9685 boards can be connected to one I2C master, giving 992 possible LEDs. 
 At the moment the firmware supports only 1 board and 16 LEDs.
 
@@ -20,6 +24,17 @@ Extra functionality:
 * 8 digital inputs value that are reported to LocoNet (Can be used as sensor board)
 * 2 analog inputs
 
+The firmware is written using PlatformIO build system and Arduino framework.
+VS Code is recommended as an IDE. 
+The code can also be built with Arduino IDE with minimal changes (some files need to be moved around and some libraries need to be installed).
+
+The project requires the following libraries:
+
+. https://github.com/mrrwa/LocoNet[LocoNet]
+. https://www.etlcpp.com/[Embedded Template Library]
+
+PlatformIO will install the required versions automatically.
+
 ## Hardware
 
 The firmware is designed to work with this decoder board:
@@ -30,7 +45,7 @@ The firmware is designed to work with this decoder board:
 
 The board features:
 
-* Arduino Pro Mini socket
+* Arduino Pro Mini socket (5V 32kB variant required)
 * PCA9685 board socket
 * 2 LocoNet jacks
 * Can be powered through LocoNet bus or from external power connector

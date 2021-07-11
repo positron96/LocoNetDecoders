@@ -1,4 +1,50 @@
-# Configuration 
+# LND-8CDU - A LocoNet turnout decoder with 8 pulsed outputs
+
+Video:
+
+image:https://img.youtube.com/vi/7XxVlCFiltA/mqdefault.jpg[link=https://www.youtube.com/watch?v=7XxVlCFiltA]
+
+This is a firmware for LocoNet-only accessory decoder for 4 twin-coil turnouts.
+Outputs are pulsed with the help of built-in capacitor unit (CDU) that provides short bursts of current needed to operate a coil turnout.
+
+
+Features:
+
+. 8 1A outputs for 4 twin-coil turnouts
+. Configurable pulse duration 
+. Configurable number of pulses for each switch command.
+. Limiting current draw when charging capacitor
+. No PC required for configuration (only a LocoNet throttle).
+
+The firmware is written using PlatformIO build system and Arduino framework.
+VS Code is recommended as an IDE. 
+The code can also be built with Arduino IDE with minimal changes (some files need to be moved around and some libraries need to be installed).
+
+The project requires https://github.com/mrrwa/LocoNet[LocoNet] library to be installed.
+PlatformIO will install the required version automatically.
+
+With minimal changes the firmware can provide continuous (not-pulsed) output to drive high-power devices like DC-motors (TODO).
+
+## Hardware
+
+The firmware is designed to be used with this decoder board:
+https://oshwlab.com/positron96/loconet-decoder.
+
+The board is based on Arduino Pro Mini (5V 16kB variant, 5V 32kB will also work), typical DIY LocoNet circuitry and contains a large 4700uF capacitor (it has place for 2 of them for even more charge).
+Outputs are driven with 2 ULN2803 ICs. 
+Each IC has 8 500 mA outputs.
+To provide more current to coils, every 2 outputs are connected in parallel to provide 1A of current for 8 coils. 
+This allows to drive 4 twin-coil turnouts.
+
+The board can be powered either via separate power source or via LocoNet plug. 
+Special handling is implemented for the case when power source cannot provide enough power to charge capacitor. 
+In this case voltage drop is measured by Arduino and charging load is limited via PWMing transitor. 
+This is especially relevant in case of powering from LocoNet bus. 
+In case this is not relevant, the corresponding circuitry can be omitted altogether.
+Also there is jumper to bypass it in case it does not work well (I have not tested this functionality on final board, only on prototype).
+
+
+## Configuration 
 
 [%header,cols="1h,4a"]
 .Available configuration variables
@@ -12,7 +58,10 @@
 
 The decoder can be configured in 2 ways:
 
-## Using throttle
+### Using throttle
+
+**TL;DR:**
+To set variable 1 to 20: go to config mode via long button press, throw turnout 1, throw turnout 20. Watch the LED for hints.
 
 . Connect a throttle and decoder to command station. 
 Command station is not needed for communication, but something needs to power the LocoNet bus, decoder and throttle.
@@ -23,14 +72,11 @@ Command station is not needed for communication, but something needs to power th
 
 . While the LED is blinking faster, the decoder is expecting variable value to be input with a throttle. Again, to set var value to M, just throw a turnout with address M. The decoder will store the new value in EEPROM and LED will start blinking normally. 
 
-**TL;DR:**
-To set variable 1 to 20: go to config mode via long button press, throw turnout 1, throw turnout 20. Watch the LED for hints.
-
 To change another value, start procedure from pt. 1.
 
 If new settings are not working, reset the board with a reset button on the Arduino and file an issue.
 
-## Using SVs
+### Using SVs
 
 TODO.
 
