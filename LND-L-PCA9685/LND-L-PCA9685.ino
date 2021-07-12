@@ -4,6 +4,7 @@
 #include "MastManager.h"
 #include "PCA9685GPIO.h"
 #include "SerialReader.h"
+#include "LedBlinker.h"
 
 constexpr int PIN_OE = 4;
 constexpr int PIN_VEN = 3;
@@ -20,6 +21,8 @@ constexpr int ADDR_IN_COUNT = 8;
 constexpr bool INPUT_PULLUP_EN = true;
 constexpr int PIN_IN[ADDR_IN_COUNT] = {11, 12, A0, A1, A2, A3, 7, 6};
 
+using LED = LedBlinker<PIN_LED>;
+
 using PCADriver = PCA9685GPIO<PIN_OE>;
 using TMastManager = MastManager<PCADriver::CH_OUT_COUNT/2, PCADriver>;
 TMastManager masts;
@@ -33,8 +36,6 @@ uint16_t startInAddr;
 
 bool configMode = false;
 uint16_t configVar = 0;
-uint32_t ledNextUpdate;
-uint8_t ledVal;
 
 constexpr uint16_t INPUT_DEBOUNCE_INTL = 10;
 
@@ -50,8 +51,6 @@ constexpr int EEPROM_MASTS_START = EEPROM_OUTPUTS_START + PCADriver::EEPROM_REQU
 
 constexpr uint8_t EEPROM_VER = PCADriver::EEPROM_VER ^ TMastManager::EEPROM_VER ^ EEPROM_HEADER_SIZE;
 
-void ledFire(uint32_t, uint8_t);
-void ledStop();
 //static void sendOutput(uint8_t ch, uint16_t val);
 
 void setup() {
@@ -60,9 +59,8 @@ void setup() {
     
     pinMode(PIN_BT, INPUT);
     
-    pinMode(PIN_LED, OUTPUT);
-    ledFire(50,0);
-
+    LED::begin();
+    
     for(int i=0; i<ADDR_IN_COUNT; i++) {
         pinMode(PIN_IN[i], INPUT_PULLUP_EN ? INPUT_PULLUP : INPUT);
     }
@@ -120,18 +118,27 @@ int hex2int(const char ch) {
     return -1;
 }
 
-void ledFire(uint32_t ms, uint8_t val=1) {
-    ledVal = val;
-    digitalWrite(PIN_LED, ledVal);  
-    ledNextUpdate = millis()+ms;
-}
-void ledOn() {
-    if(ledNextUpdate!=0) return;
-    ledFire(0,0);
-}
-void ledStop() {
-    digitalWrite(PIN_LED, LOW); 
-    ledNextUpdate = 0; // turn off blink
+void setConfigMode(uint8_t stage, uint16_t var=0) {
+    switch(stage) {
+    case 0:
+        if(configMode) Serial<<=F("Quitting config mode");
+        configMode = false;
+        LED::setIntl(LED_INTL_NORMAL);
+        break;
+    case 1:
+        Serial<<=F("Waiting for cfg var");
+        configMode = true;
+        configVar = 0;
+        LED::setIntl(LED_INTL_CONFIG1);
+        break;
+    case 2:
+        Serial<<=F("Waiting for cfg value");
+        configMode = true;
+        configVar = var;
+        Serial<<F("Selected var ")<<=configVar;
+        LED::setIntl(LED_INTL_CONFIG2);
+        break;
+    }
 }
 
 void checkButton() {
@@ -141,24 +148,22 @@ void checkButton() {
     if(bt==1 && lastBt==0) {
         //Serial.println("Button down");
         btPressTime = millis();
-        if(configMode) Serial<<=F("Quitting config mode");
-        configMode=false;
+        setConfigMode(0);
         delay(5); // simple debounce
-        ledStop();
+        LED::pause();
     }
     if(bt==1 && btPressTime!=0) {
         if(millis()-btPressTime>BUTTON_LONG_PRESS_DURATION && !configMode) { 
-            configMode=true;
-            configVar=0;
+            setConfigMode(1);
             Serial<<=F("Entering config mode");
-            ledOn(); // start blink again
+            LED::resume(); // start blink again
         }
     }
     if(bt==0 && lastBt==1) {
         //Serial.println(String("Button was down for ")+(millis()-btPressTime));
         btPressTime = 0;
         delay(5); // simple debounce
-        ledOn(); // start blink again
+        LED::resume(); // start blink again
     }
     lastBt = bt;
 }
@@ -182,7 +187,7 @@ void checkInputs() {
                 // in = jitter-free value
                 uint16_t inAddr = startInAddr+i;
                 Serial<<F("Input ")<<i<<F("(addr ")<<inAddr<<F(") changed to ")<<=in;
-                ledFire(100);
+                LED::fire(100);
                 LocoNet.reportSensor(inAddr, in);
             }
             lastIns[i] = in;
@@ -214,7 +219,7 @@ void processImmPacket(sendPktMsg &m) {
     Serial<<F("Imm address = ")<<=addr;
     uint8_t aspect = d[2]; 
     Serial<<F("aspect=")<<=aspect;
-    ledFire(100);
+    LED::fire(100);
     int16_t idx = masts.findAddr(addr);
     if(idx>=0)
         masts.setAspect(idx, aspect);
@@ -237,17 +242,7 @@ void loop() {
 
     checkInputs();
 
-    if(ledNextUpdate!=0 && millis()>ledNextUpdate) {
-        ledVal = 1-ledVal;
-        digitalWrite(PIN_LED, ledVal);
-        
-        if(!configMode) {
-            ledNextUpdate = LED_INTL_NORMAL; 
-        } else {
-            ledNextUpdate = configVar==0 ? LED_INTL_CONFIG1 : LED_INTL_CONFIG2;
-        }
-        ledNextUpdate += millis();
-    }
+    LED::loop();
 
     masts.tick();
 
@@ -353,7 +348,7 @@ void notifySwitchRequest( uint16_t addr, uint8_t out, uint8_t dir ) {
     if(!configMode) {
         for(auto &m: masts.getMasts() ) {
             if(addr >= m.busAddr() && addr<m.busAddr() + m.getAspectCount() ) {
-                ledFire(100);
+                LED::fire(100);
                 m.setAspect(addr-m.busAddr());
             }
         }
@@ -363,16 +358,15 @@ void notifySwitchRequest( uint16_t addr, uint8_t out, uint8_t dir ) {
         // set addr
         if(thrown) {
             if(configVar==0) {
-                configVar = addr;
-                Serial<<F("Selected var ")<<=configVar;
+                setConfigMode(2, addr);
             } else {
                 //startOutAddr = addr;
                 //sv.writeSvNodeId(startOut);
                 //Serial.print(F("Changed start address to "));
                 //Serial.println(startOutAddr);
-                configVar = 0;
+                setConfigMode(0);
             }
-            ledFire(2000);
+            LED::fire(2000);
         }
     }
 
