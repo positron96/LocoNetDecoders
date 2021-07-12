@@ -10,7 +10,7 @@ constexpr int PIN_OE = 4;
 constexpr int PIN_VEN = 3;
 
 constexpr int PIN_LED = 10;
-constexpr int PIN_BT = 2;
+constexpr int PIN_BTN = 2;
 
 constexpr int PIN_TX = 9;
 constexpr int PIN_RX = 8;
@@ -21,7 +21,9 @@ constexpr int ADDR_IN_COUNT = 8;
 constexpr bool INPUT_PULLUP_EN = true;
 constexpr int PIN_IN[ADDR_IN_COUNT] = {11, 12, A0, A1, A2, A3, 7, 6};
 
-using LED = LedBlinker<PIN_LED>;
+constexpr int TIMER_INTL = 25;
+
+using LED = LedBlinker<PIN_LED, TIMER_INTL>;
 
 using PCADriver = PCA9685GPIO<PIN_OE>;
 using TMastManager = MastManager<PCADriver::CH_OUT_COUNT/2, PCADriver>;
@@ -57,7 +59,7 @@ void setup() {
     Serial.begin(115200);
     Serial.println(F("LND-L - LocoNet accessory decoder with 16 LEDs and 8 inputs"));
     
-    pinMode(PIN_BT, INPUT);
+    pinMode(PIN_BTN, INPUT);
     
     LED::begin();
     
@@ -144,7 +146,7 @@ void setConfigMode(uint8_t stage, uint16_t var=0) {
 void checkButton() {
     static uint8_t lastBt;
     static long btPressTime = 0;
-    uint8_t bt = 1-digitalRead(PIN_BT); // it's inverted
+    uint8_t bt = 1-digitalRead(PIN_BTN); // it's inverted
     if(bt==1 && lastBt==0) {
         //Serial.println("Button down");
         btPressTime = millis();
@@ -155,7 +157,6 @@ void checkButton() {
     if(bt==1 && btPressTime!=0) {
         if(millis()-btPressTime>BUTTON_LONG_PRESS_DURATION && !configMode) { 
             setConfigMode(1);
-            Serial<<=F("Entering config mode");
             LED::resume(); // start blink again
         }
     }
@@ -238,11 +239,16 @@ void loop() {
         }
     }
 
+    static uint32_t lastUpdate=0;
+
+    if(millis()-lastUpdate > TIMER_INTL) {
+        lastUpdate = millis();
+        LED::loop();
+    }
+
     checkButton();
 
-    checkInputs();
-
-    LED::loop();
+    checkInputs();    
 
     masts.tick();
 
@@ -250,7 +256,7 @@ void loop() {
     static long nextInRead = 0;
     static int lastV=0;
     if(millis()>nextInRead) {
-        int v = 1-digitalRead(PIN_BT);
+        int v = 1-digitalRead(PIN_BTN);
         if(v!=lastV) {
             //LocoNet.reportSensor(11, v==1);// it's pulled up when idle.
             lastV = v;
@@ -371,17 +377,4 @@ void notifySwitchRequest( uint16_t addr, uint8_t out, uint8_t dir ) {
     }
 
 }
-
-/*
-void reportChannelState(uint8_t ch) {
-    uint16_t addr = startOutAddr+ch;
-    addr -= 1;
-    lnMsg txMsg;
-    txMsg.srp.command = OPC_SW_REP;
-    txMsg.srp.sn1 = addr & 0x7F;
-    txMsg.srp.sn2 = ((addr >> 7) & 0x0F)  
-        |  (bitRead(output,ch) ? OPC_SW_REP_THROWN: OPC_SW_REP_CLOSED)  ;
-    LocoNet.send(&txMsg);
-}
-*/
 
