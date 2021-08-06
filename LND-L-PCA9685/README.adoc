@@ -52,6 +52,9 @@ The board features:
 * Button to enter configuration
 * Indicator LED
 
+The code is compatible with PCBs v1 and v2 (pins are different), the board in use can be selected by 
+uncommented corresponding ifdefs in `.ino` file.
+
 ## User manual
 
 ### Aspect values

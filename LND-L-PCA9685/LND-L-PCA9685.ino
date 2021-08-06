@@ -5,11 +5,6 @@
 #include "PCA9685GPIO.h"
 #include "SerialReader.h"
 
-constexpr int PIN_OE = 4;
-constexpr int PIN_VEN = 3;
-
-constexpr int PIN_LED = 10;
-constexpr int PIN_BT = 2;
 
 constexpr int PIN_TX = 9;
 constexpr int PIN_RX = 8;
@@ -17,8 +12,27 @@ constexpr int PIN_RX = 8;
 constexpr int ADDR_OUT_COUNT = 16;
 constexpr int ADDR_IN_COUNT = 8;
 
+//=== PCB V1
+constexpr int PIN_OE = 4;
+constexpr int PIN_VEN = 3;
+
+constexpr int PIN_LED = 10;
+constexpr int PIN_BT = 2;
+
 constexpr bool INPUT_PULLUP_EN = true;
 constexpr int PIN_IN[ADDR_IN_COUNT] = {11, 12, A0, A1, A2, A3, 7, 6};
+
+//=== PCB V2
+/*
+constexpr int PIN_OE = 5;
+constexpr int PIN_VEN = 4;
+
+constexpr int PIN_LED = 6;
+constexpr int PIN_BT = 2;
+
+constexpr bool INPUT_PULLUP_EN = true;
+constexpr int PIN_IN[ADDR_IN_COUNT] = {11, 12, A0, A1, A2, A3, 7, 3};
+*/
 
 using PCADriver = PCA9685GPIO<PIN_OE>;
 using TMastManager = MastManager<PCADriver::CH_OUT_COUNT/2, PCADriver>;
