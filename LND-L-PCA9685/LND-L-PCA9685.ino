@@ -4,7 +4,7 @@
 #include "MastManager.h"
 #include "PCA9685GPIO.h"
 #include "SerialReader.h"
-
+#include "LedBlinker.h"
 
 constexpr int PIN_TX = 9;
 constexpr int PIN_RX = 8;
@@ -17,7 +17,7 @@ constexpr int PIN_OE = 4;
 constexpr int PIN_VEN = 3;
 
 constexpr int PIN_LED = 10;
-constexpr int PIN_BT = 2;
+constexpr int PIN_BTN = 2;
 
 constexpr bool INPUT_PULLUP_EN = true;
 constexpr int PIN_IN[ADDR_IN_COUNT] = {11, 12, A0, A1, A2, A3, 7, 6};
@@ -28,11 +28,14 @@ constexpr int PIN_OE = 5;
 constexpr int PIN_VEN = 4;
 
 constexpr int PIN_LED = 6;
-constexpr int PIN_BT = 2;
+constexpr int PIN_BTN = 2;
 
 constexpr bool INPUT_PULLUP_EN = true;
 constexpr int PIN_IN[ADDR_IN_COUNT] = {11, 12, A0, A1, A2, A3, 7, 3};
 */
+constexpr int TIMER_INTL = 25;
+
+using LED = LedBlinker<PIN_LED, TIMER_INTL>;
 
 using PCADriver = PCA9685GPIO<PIN_OE>;
 using TMastManager = MastManager<PCADriver::CH_OUT_COUNT/2, PCADriver>;
@@ -47,8 +50,6 @@ uint16_t startInAddr;
 
 bool configMode = false;
 uint16_t configVar = 0;
-uint32_t ledNextUpdate;
-uint8_t ledVal;
 
 constexpr uint16_t INPUT_DEBOUNCE_INTL = 10;
 
@@ -64,19 +65,16 @@ constexpr int EEPROM_MASTS_START = EEPROM_OUTPUTS_START + PCADriver::EEPROM_REQU
 
 constexpr uint8_t EEPROM_VER = PCADriver::EEPROM_VER ^ TMastManager::EEPROM_VER ^ EEPROM_HEADER_SIZE;
 
-void ledFire(uint32_t, uint8_t);
-void ledStop();
 //static void sendOutput(uint8_t ch, uint16_t val);
 
 void setup() {
     Serial.begin(115200);
     Serial.println(F("LND-L - LocoNet accessory decoder with 16 LEDs and 8 inputs"));
     
-    pinMode(PIN_BT, INPUT);
+    pinMode(PIN_BTN, INPUT);
     
-    pinMode(PIN_LED, OUTPUT);
-    ledFire(50,0);
-
+    LED::begin();
+    
     for(int i=0; i<ADDR_IN_COUNT; i++) {
         pinMode(PIN_IN[i], INPUT_PULLUP_EN ? INPUT_PULLUP : INPUT);
     }
@@ -99,7 +97,7 @@ void setup() {
         startInAddr = 10;
         PCADriver::reset();
         masts.reset();
-        save();
+        //save();
     } 
     
     
@@ -122,7 +120,7 @@ void listMasts() {
     int i=0; 
     Serial<<F("Masts count: ")<<=masts.size();
     for(const auto &m: masts.getMasts() ) {
-        Serial<<F("Mast ")<<i<<F("; addr=")<<m.busAddr()<<F("; channel=")<<=m.ch;
+        Serial<<F("Mast ")<<i<<F(" addr:")<<m.busAddr()<<F(" channel:")<<m.ch<<F(" aspect:")<<=m.getAspect();
         i++;
     }
 }
@@ -134,45 +132,51 @@ int hex2int(const char ch) {
     return -1;
 }
 
-void ledFire(uint32_t ms, uint8_t val=1) {
-    ledVal = val;
-    digitalWrite(PIN_LED, ledVal);  
-    ledNextUpdate = millis()+ms;
-}
-void ledOn() {
-    if(ledNextUpdate!=0) return;
-    ledFire(0,0);
-}
-void ledStop() {
-    digitalWrite(PIN_LED, LOW); 
-    ledNextUpdate = 0; // turn off blink
+void setConfigMode(uint8_t stage, uint16_t var=0) {
+    switch(stage) {
+    case 0:
+        if(configMode) Serial<<=F("Quitting config mode");
+        configMode = false;
+        LED::setIntl(LED_INTL_NORMAL);
+        break;
+    case 1:
+        Serial<<=F("Waiting for cfg var");
+        configMode = true;
+        configVar = 0;
+        LED::setIntl(LED_INTL_CONFIG1);
+        break;
+    case 2:
+        Serial<<=F("Waiting for cfg value");
+        configMode = true;
+        configVar = var;
+        Serial<<F("Selected var ")<<=configVar;
+        LED::setIntl(LED_INTL_CONFIG2);
+        break;
+    }
 }
 
 void checkButton() {
     static uint8_t lastBt;
     static long btPressTime = 0;
-    uint8_t bt = 1-digitalRead(PIN_BT); // it's inverted
+    uint8_t bt = 1-digitalRead(PIN_BTN); // it's inverted
     if(bt==1 && lastBt==0) {
         //Serial.println("Button down");
         btPressTime = millis();
-        if(configMode) Serial<<=F("Quitting config mode");
-        configMode=false;
+        setConfigMode(0);
         delay(5); // simple debounce
-        ledStop();
+        LED::pause();
     }
     if(bt==1 && btPressTime!=0) {
         if(millis()-btPressTime>BUTTON_LONG_PRESS_DURATION && !configMode) { 
-            configMode=true;
-            configVar=0;
-            Serial<<=F("Entering config mode");
-            ledOn(); // start blink again
+            setConfigMode(1);
+            LED::resume(); // start blink again
         }
     }
     if(bt==0 && lastBt==1) {
         //Serial.println(String("Button was down for ")+(millis()-btPressTime));
         btPressTime = 0;
         delay(5); // simple debounce
-        ledOn(); // start blink again
+        LED::resume(); // start blink again
     }
     lastBt = bt;
 }
@@ -196,7 +200,7 @@ void checkInputs() {
                 // in = jitter-free value
                 uint16_t inAddr = startInAddr+i;
                 Serial<<F("Input ")<<i<<F("(addr ")<<inAddr<<F(") changed to ")<<=in;
-                ledFire(100);
+                LED::fire(100);
                 LocoNet.reportSensor(inAddr, in);
             }
             lastIns[i] = in;
@@ -228,7 +232,7 @@ void processImmPacket(sendPktMsg &m) {
     Serial<<F("Imm address = ")<<=addr;
     uint8_t aspect = d[2]; 
     Serial<<F("aspect=")<<=aspect;
-    ledFire(100);
+    LED::fire(100);
     int16_t idx = masts.findAddr(addr);
     if(idx>=0)
         masts.setAspect(idx, aspect);
@@ -247,21 +251,16 @@ void loop() {
         }
     }
 
+    static uint32_t lastUpdate=0;
+
+    if(millis()-lastUpdate > TIMER_INTL) {
+        lastUpdate = millis();
+        LED::loop();
+    }
+
     checkButton();
 
-    checkInputs();
-
-    if(ledNextUpdate!=0 && millis()>ledNextUpdate) {
-        ledVal = 1-ledVal;
-        digitalWrite(PIN_LED, ledVal);
-        
-        if(!configMode) {
-            ledNextUpdate = LED_INTL_NORMAL; 
-        } else {
-            ledNextUpdate = configVar==0 ? LED_INTL_CONFIG1 : LED_INTL_CONFIG2;
-        }
-        ledNextUpdate += millis();
-    }
+    checkInputs();    
 
     masts.tick();
 
@@ -269,7 +268,7 @@ void loop() {
     static long nextInRead = 0;
     static int lastV=0;
     if(millis()>nextInRead) {
-        int v = 1-digitalRead(PIN_BT);
+        int v = 1-digitalRead(PIN_BTN);
         if(v!=lastV) {
             //LocoNet.reportSensor(11, v==1);// it's pulled up when idle.
             lastV = v;
@@ -367,7 +366,7 @@ void notifySwitchRequest( uint16_t addr, uint8_t out, uint8_t dir ) {
     if(!configMode) {
         for(auto &m: masts.getMasts() ) {
             if(addr >= m.busAddr() && addr<m.busAddr() + m.getAspectCount() ) {
-                ledFire(100);
+                LED::fire(100);
                 m.setAspect(addr-m.busAddr());
             }
         }
@@ -377,31 +376,17 @@ void notifySwitchRequest( uint16_t addr, uint8_t out, uint8_t dir ) {
         // set addr
         if(thrown) {
             if(configVar==0) {
-                configVar = addr;
-                Serial<<F("Selected var ")<<=configVar;
+                setConfigMode(2, addr);
             } else {
                 //startOutAddr = addr;
                 //sv.writeSvNodeId(startOut);
                 //Serial.print(F("Changed start address to "));
                 //Serial.println(startOutAddr);
-                configVar = 0;
+                setConfigMode(0);
             }
-            ledFire(2000);
+            LED::fire(2000);
         }
     }
 
 }
-
-/*
-void reportChannelState(uint8_t ch) {
-    uint16_t addr = startOutAddr+ch;
-    addr -= 1;
-    lnMsg txMsg;
-    txMsg.srp.command = OPC_SW_REP;
-    txMsg.srp.sn1 = addr & 0x7F;
-    txMsg.srp.sn2 = ((addr >> 7) & 0x0F)  
-        |  (bitRead(output,ch) ? OPC_SW_REP_THROWN: OPC_SW_REP_CLOSED)  ;
-    LocoNet.send(&txMsg);
-}
-*/
 

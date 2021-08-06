@@ -32,7 +32,7 @@ public:
     uint8_t curAspect;
     uint32_t lastChangeTime;
 
-    static constexpr int EEPROM_REQUIRED = 2;
+    static constexpr int EEPROM_REQUIRED = sizeof(info_t);
 
 public:
     Mast(uint16_t busAddress, ch_t outputChannel, uint8_t nheads)
@@ -74,7 +74,7 @@ public:
         }
     }
 
-    uint8_t getAspect() { return curAspect; }
+    uint8_t getAspect() const { return curAspect; }
 
     void tick() {
         if(lastChangeTime==0) return;
@@ -272,8 +272,8 @@ public:
     MastsVector & getMasts() { return masts; }
 
 
-    static constexpr uint8_t EEPROM_VER = 1;
     static constexpr int EEPROM_REQUIRED = mast_idx_t_size + MAX_MASTS*TMast::EEPROM_REQUIRED;
+    static constexpr uint8_t EEPROM_VER = 1 ^ EEPROM_REQUIRED;
 
     bool load(int eepromAddr) {
         clear();

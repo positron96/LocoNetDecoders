@@ -114,7 +114,7 @@ void PCA9685Driver::setPWMFreq(uint16_t freq) {
     if (freq > 1526)
         freq = 1526; // With minimal prescaler 0x3 and 25 MHz
 
-    uint32_t prescale = (FREQUENCY_OSCILLATOR_FREQ / (freq * 4096)) - 1;
+    uint32_t prescale = (FREQUENCY_OSCILLATOR_FREQ / freq / 4096) - 1;
     if (prescale < PCA9685_PRESCALE_MIN)
         prescale = PCA9685_PRESCALE_MIN;
     if (prescale > PCA9685_PRESCALE_MAX)
