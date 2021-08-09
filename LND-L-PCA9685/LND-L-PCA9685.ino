@@ -2,7 +2,7 @@
 
 #include "SerialUtils.h"
 #include "MastManager.h"
-#include "PCA9685GPIO.h"
+#include "TLC5947GPIO.h"
 #include "SerialReader.h"
 #include "LedBlinker.h"
 
@@ -33,12 +33,17 @@ constexpr int PIN_BTN = 2;
 constexpr bool INPUT_PULLUP_EN = true;
 constexpr int PIN_IN[ADDR_IN_COUNT] = {11, 12, A0, A1, A2, A3, 7, 3};
 */
+
+constexpr int PIN_TLC_CLK = PIN_WIRE_SDA;
+constexpr int PIN_TLC_DAT = PIN_WIRE_SCL;
+constexpr int PIN_TLC_LATCH = PIN_OE;
+
 constexpr int TIMER_INTL = 25;
 
 using LED = LedBlinker<PIN_LED, TIMER_INTL>;
 
-using PCADriver = PCA9685GPIO<PIN_OE>;
-using TMastManager = MastManager<PCADriver::CH_OUT_COUNT/2, PCADriver>;
+using PwmDriver = TLC5947GPIO<PIN_TLC_CLK, PIN_TLC_DAT, PIN_TLC_LATCH>;
+using TMastManager = MastManager<PwmDriver::CH_OUT_COUNT/2, PwmDriver>;
 TMastManager masts;
 
 struct eeprom_cfg_t {
@@ -61,9 +66,9 @@ constexpr int LED_INTL_CONFIG2 = 150;
 
 constexpr int EEPROM_HEADER_SIZE = sizeof(eeprom_cfg_t);
 constexpr int EEPROM_OUTPUTS_START = EEPROM_HEADER_SIZE;
-constexpr int EEPROM_MASTS_START = EEPROM_OUTPUTS_START + PCADriver::EEPROM_REQUIRED;
+constexpr int EEPROM_MASTS_START = EEPROM_OUTPUTS_START + PwmDriver::EEPROM_REQUIRED;
 
-constexpr uint8_t EEPROM_VER = PCADriver::EEPROM_VER ^ TMastManager::EEPROM_VER ^ EEPROM_HEADER_SIZE;
+constexpr uint8_t EEPROM_VER = PwmDriver::EEPROM_VER ^ TMastManager::EEPROM_VER ^ EEPROM_HEADER_SIZE;
 
 //static void sendOutput(uint8_t ch, uint16_t val);
 
@@ -81,21 +86,21 @@ void setup() {
 
     pinMode(PIN_VEN, OUTPUT);
     digitalWrite(PIN_VEN, HIGH); // disable 5Vo
-    PCADriver::initHw();
+    PwmDriver::initHw();
     digitalWrite(PIN_VEN, LOW); // enable 5Vo
 
-    static_assert( EEPROM_HEADER_SIZE + PCADriver::EEPROM_REQUIRED + TMastManager::EEPROM_REQUIRED < E2END, 
+    static_assert( EEPROM_HEADER_SIZE + PwmDriver::EEPROM_REQUIRED + TMastManager::EEPROM_REQUIRED < E2END, 
         "EEPROM size exceeded");
     eeprom_cfg_t cc;
     EEPROM.get<eeprom_cfg_t>(0, cc);
     if(cc.ver == EEPROM_VER) {
         startInAddr = cc.inAddr;  
-        PCADriver::load(EEPROM_OUTPUTS_START);
+        PwmDriver::load(EEPROM_OUTPUTS_START);
         masts.load(EEPROM_MASTS_START);
     } else {
         Serial<<=F("Bad EEPROM, loading default values");
         startInAddr = 10;
-        PCADriver::reset();
+        PwmDriver::reset();
         masts.reset();
         //save();
     } 
@@ -112,7 +117,7 @@ void save() {
     eeprom_cfg_t cc{ .ver=EEPROM_VER, .inAddr=startInAddr };
 
     EEPROM.put<eeprom_cfg_t>(0, cc);;
-    PCADriver::save(EEPROM_OUTPUTS_START);
+    PwmDriver::save(EEPROM_OUTPUTS_START);
     masts.save(EEPROM_MASTS_START);
 }
 
@@ -311,14 +316,14 @@ void loop() {
             listMasts();
         } else
         if(strcmp(cmd, "br")==0) {
-            PCADriver::channel_t ch = atoi(ser.bufPart(1));
+            PwmDriver::channel_t ch = atoi(ser.bufPart(1));
             uint16_t mx = atoi(ser.bufPart(2));
-            PCADriver::setMaxPWM( ch, mx );
+            PwmDriver::setMaxPWM( ch, mx );
             Serial<<F("Set max PWM for channel ")<<ch<<':'<<=mx;
         } else
         if(strcmp(cmd, "reset")==0) {
             Serial<<=F("Loading defaults");
-            PCADriver::reset();
+            PwmDriver::reset();
             masts.reset();
         } else 
         if(strcmp(cmd, "save")==0) {
@@ -336,7 +341,7 @@ void loop() {
             int ch = atoi(ser.bufPart(1));
             int v = atoi(ser.bufPart(2));
             Serial<<F("Setting ch ")<<ch<<F(" to ")<<=v;
-            PCADriver::set(ch, v!=0);
+            PwmDriver::set(ch, v!=0);
         } else 
 
         if(strcmp(cmd, "inaddr")==0) {
