@@ -151,7 +151,8 @@ private:
             if(s!=CH_OUT_COUNT && c>=s && c<=e) {
                 for(int i=0; i<N; i++) if(c==ch[i]) {v=vals[i]; break;}
             }
-            if(v<0) v = get(c) ? maxPWM12(states[c].maxPWM) : 0;
+            if(v<0) v = get(c) ? maxPWM12(c) : 0;
+
             // 12 bits per channel, send MSB first
             for (int8_t b = 11; b >= 0; b--) {
                 digitalWrite(PIN_CLK, LOW);

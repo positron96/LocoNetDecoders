@@ -34,8 +34,8 @@ constexpr bool INPUT_PULLUP_EN = true;
 constexpr int PIN_IN[ADDR_IN_COUNT] = {11, 12, A0, A1, A2, A3, 7, 3};
 */
 
-constexpr int PIN_TLC_CLK = PIN_WIRE_SDA;
-constexpr int PIN_TLC_DAT = PIN_WIRE_SCL;
+constexpr int PIN_TLC_CLK = PIN_WIRE_SCL;
+constexpr int PIN_TLC_DAT = PIN_WIRE_SDA;
 constexpr int PIN_TLC_LATCH = PIN_OE;
 
 constexpr int TIMER_INTL = 25;
