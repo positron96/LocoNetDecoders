@@ -86,8 +86,12 @@ constexpr uint8_t EEPROM_VER = PwmDriver::EEPROM_VER ^ TMastManager::EEPROM_VER 
 
 void setup() {
     Serial.begin(115200);
-    Serial.println(F("LND-L - LocoNet accessory decoder with 16 LEDs and 8 inputs"));
-    
+    #if defined(PCA9685)
+    Serial.println(F("LND-L-PCA9685 - LocoNet accessory decoder with 16 LEDs and 8 inputs"));
+    #else
+    Serial.println(F("LND-L-TLC5947 - LocoNet accessory decoder with 24 LEDs and 8 inputs"));
+    #endif
+
     pinMode(PIN_BTN, INPUT);
     
     LED::begin();
