@@ -1,18 +1,30 @@
 :imagesdir: docs
 
-## LND-L-PCA9685 - A 16 LED LocoNet decoder
+## LND-L-PCA9685 (and LND-L-TLC5947) - A 16(24) LED LocoNet decoder
 
 
 image:https://img.youtube.com/vi/hhKzCz2ck-I/mqdefault.jpg[link=https://www.youtube.com/watch?v=hhKzCz2ck-I]
 
+### LND-L-PCA9685
 
-This is a firmware for LocoNet-only accessory decoder for 16 LEDs.
+This is a firmware for LocoNet-only accessory decoder for LEDs.
 
-PCA9685 module (or bare IC) is used to controll LEDs. 
+PCA9685 module (or bare IC) is used to control LEDs. 
 Theoretically, 62 PCA9685 boards can be connected to one I2C master, giving 992 possible LEDs. 
 At the moment the firmware supports only 1 board and 16 LEDs.
 
-Features:
+### LND-L-TLC5947
+
+A firmware for the same PCB, but instead of PCA9685 it uses TLC5947 LED driver module.
+
+It allows to control 24 LEDs (1 module). 
+
+The module uses shift-register-like interface, does not have separate LED power pin, so on the decoder itself there is no need for MOSFETs. 
+
+Thoretically, TLC5947 can be chained like shift registers, but the firmware does not yet support it.
+
+
+Common features:
 
 * Smooth lightup/fade
 * Separate brightness for each LED output
@@ -21,7 +33,7 @@ Features:
 
 Extra functionality:
 
-* 8 digital inputs value that are reported to LocoNet (Can be used as sensor board)
+* 8 digital inputs value that are reported to LocoNet (Can be used as sensor board).
 * 2 analog inputs
 
 The firmware is written using PlatformIO build system and Arduino framework.
@@ -35,6 +47,9 @@ The project requires the following libraries:
 
 PlatformIO will install the required versions automatically.
 
+Selection between PCA9685 and TLC5947 is done with respective defines (look into `build_flags` in `platformio.ini`).
+By default, PCA9685 is built.
+
 ## Hardware
 
 The firmware is designed to work with this decoder board:
@@ -45,15 +60,15 @@ The firmware is designed to work with this decoder board:
 
 The board features:
 
-* Arduino Pro Mini socket (5V 32kB variant required)
-* PCA9685 board socket
+* Arduino Pro Mini socket (5V variant required, the firmware fits into both 32 and 16 Kb)
+* Socket for PCA9685 board (TLC5947 can be used instead)
 * 2 LocoNet jacks
 * Can be powered through LocoNet bus or from external power connector
-* Button to enter configuration
+* Button to enter configuration mode
 * Indicator LED
 
 The code is compatible with PCBs v1 and v2 (pins are different), the board in use can be selected by 
-uncommented corresponding ifdefs in `.ino` file.
+uncommenting corresponding ifdefs in `.ino` file.
 
 ## User manual
 
@@ -190,3 +205,18 @@ Current version supports 1-, 2- and 3-lamp signals.
 
 
 ### Configuration
+
+The firmware supports configuration via Arduino's UART (UART is 115200 baud, 8N1). 
+This way of configuration is always availalble, there is no need to switch to configuration mode.
+The following commands are implemented:
+
+////
+When UART cannot be used, simple configuration can be done with a throttle.
+Physical access to the decoder is still required to press the button on the decoder.
+To use this simple mode, the firmware be switched to configuration mode by holding the button for 3s.
+After that, the decoder will wait for a turnout command. The address of the turnout
+////
+The firmware had an way to configure some parameters via throttle commands without the need for a PC and UART.
+This is removed now, but may be implemented again in future.
+
+LocoNet commands (SV or CV) may be implemented in future.
