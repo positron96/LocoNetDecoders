@@ -333,7 +333,7 @@ void loop() {
         } else
         if(strcmp(cmd, "br")==0) {
             PwmDriver::channel_t ch = atoi(ser.bufPart(1));
-            uint16_t mx = atoi(ser.bufPart(2));
+            uint8_t mx = atoi(ser.bufPart(2));
             PwmDriver::setMaxPWM( ch, mx );
             Serial<<F("Set max PWM for channel ")<<ch<<':'<<=mx;
         } else

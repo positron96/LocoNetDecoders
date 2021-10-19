@@ -2,6 +2,10 @@
 
 #include <Arduino.h>
 
+/**
+ * A class that reads characters from Stream, splits data into strings (separated by '\n' or '\r')
+ * and splits each string into tokens (separated by space)
+ */ 
 class SerialReader {
 public:
 
@@ -9,6 +13,10 @@ public:
         
     }
 
+    /** 
+     * Reads data from Stream and returns true if a new line was read and parsed into tokens.
+     * Call this function preiodically.
+     */ 
     bool checkSerial(Stream &ser) {
 
         while (ser.available()) {
@@ -32,21 +40,28 @@ public:
 
     }
 
+    /** 
+     * Clears currently parsed list of tokens. 
+     * There is no need to call this function, but calling `bufPart()` when reading of the next line has started, will yield garbled data.
+     */
     void drop() { nParts=0; }
 
+    /** Returns number of tokens in current line. */
     uint8_t bufParts() const { return nParts; }
+
+    /** Returns required token from current line. */
     char* bufPart(uint8_t n) const { 
         if(n<nParts) return parts[n];
         return nullptr;
     }
 
 private:
-    static constexpr uint8_t BUF_SIZE = 20;
+    static constexpr uint8_t BUF_SIZE = 20; /// maximum length of a string
     char buf[BUF_SIZE+1];
     uint8_t bufLen;
 
-    static constexpr uint8_t MAX_PARTS = 3;
-    char* parts[MAX_PARTS]; // command of at most 3 parts
+    static constexpr uint8_t MAX_PARTS = 3; ///< maximum number of tokens in the string.
+    char* parts[MAX_PARTS];
     uint8_t nParts;
 
     bool tryParseResponse(char* str, uint8_t sz) {

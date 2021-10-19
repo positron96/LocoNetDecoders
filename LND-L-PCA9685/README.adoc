@@ -2,6 +2,7 @@
 
 ## LND-L-PCA9685 (and LND-L-TLC5947) - A 16(24) LED LocoNet decoder
 
+Video demonstration:
 
 image:https://img.youtube.com/vi/hhKzCz2ck-I/mqdefault.jpg[link=https://www.youtube.com/watch?v=hhKzCz2ck-I]
 
@@ -226,23 +227,25 @@ Current version supports 1-, 2- and 3-lamp signals.
 
 ### Configuration
 
-The firmware supports configuration via Arduino's UART (UART is 115200 baud, 8N1). 
-This way of configuration is always availalble, there is no need to switch to configuration mode.
+The firmware supports configuration via Arduino's UART (at 115200 baud, 8N1). 
+This way of configuration is always availalble, there is no need to switch to configuration mode. 
+An UART converter (USB-UART) needs to be attached to the Arduino, so physical access to the decoder is required.
+The commands are separated by "\n" or "\r".
 The following commands are implemented:
 
-* `listmasts` - print list of all defined masts.
-* `addmast <nh> <addr>` - add mast with address `<addr>` and `<nh>` heads
-* `delmast` - delete last mast.
-* `clearmasts` - remove all masts.
-* `br <ch> <max>` - set maximum brightness of channel `<ch>`(0-based) to `<max>`(1..255).
-* `inaddr <addr>` - set address of first input channel to `<addr>`.
-* `reset` - load default configuration.
-* `save` - save current config to EEPROM. 
+* `listmasts` - print list of all defined masts
+* `addmast <nh> <addr>` - add mast with address `<addr>` and `<nh>`(1..3) heads
+* `delmast` - delete last mast
+* `clearmasts` - remove all masts
+* `br <ch> <max>` - set maximum brightness of output channel `<ch>`(0-based) to `<max>`(1..255)
+* `inaddr <addr>` - set address of first input channel to `<addr>`
+* `reset` - load default configuration
+* `save` - save current config to EEPROM
   Don't forget to issue this command after changing configuration!
-* `off` - turn off all masts.
+* `off` - Set aspect 0 to all masts (turn them off)
 * `ch <ch> <val>` - set output channel `<ch>`(0-based) value to `<val>`(0/1)
-* `mast <N>` - select mast `<N>`(0-based index) for the following command.
-* `0`..`9`,`A`..`F` - set aspect of selected mast to this hex value.
+* `mast <N>` - select mast `<N>`(0-based index) for the following command
+* `0`..`9`,`A`..`F` - set aspect of selected mast to this hex value
 
 
 ////
