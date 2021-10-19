@@ -22,6 +22,8 @@ public:
         pinMode(PIN_LATCH, OUTPUT);
         digitalWrite(PIN_LATCH, LOW);
 
+        write();
+
         //digitalWrite(PIN_OEn, LOW); 
     
     }
