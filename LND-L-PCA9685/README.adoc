@@ -72,6 +72,24 @@ uncommenting corresponding ifdefs in `.ino` file.
 
 ## User manual
 
+### Addressing
+
+Each mast has its own 11-bit address. 
+The preferred way to control the masts is to issue a LocoNet OPC_IMM_PACKET packet with raw DCC data that contains an extended accessory DCC packet. 
+Such packets contain an address of the mast and an aspect to be set, so this maps naturally to the mast+aspect architecture of the decoder.
+
+For compatibility, ordinary turnout commands (OPC_SW_REQ) are also supported. 
+When there is an mast with address M, sending a turnout ON command 
+(both Thrown or Closed) at address M+A will set aspect A at mast M.
+Therefore, in this mode, each mast has a range of addresses associated with it, and it is required that ranges for different masts do not overlap. 
+The firmware, however, makes no checks for this and will operate several masts if 
+the turnout address falls into ranges of several masts.
+
+All inputs have a continous range of addresses. 
+Only the first address I is stored in the firmware, i.e. address for the first input channel. 2nd channel gets address I+1, 3rd gets address I+2, etc.
+When the inputs change state, the firmware sends a OPC_INPUT_REP LocoNet packet with input address and new input state.
+As far as I know, these addresses may overlap with mast adresses without problems.
+
 ### Aspect values
 
 Aspects are modeled after http://www.modelldepo.ru/dcc/index.php?current_folder=46[ModellDepo TrafficLight  decoder (RU)], which supports USSR and Russian signaling system. 
@@ -210,13 +228,28 @@ The firmware supports configuration via Arduino's UART (UART is 115200 baud, 8N1
 This way of configuration is always availalble, there is no need to switch to configuration mode.
 The following commands are implemented:
 
+* `listmasts` - print list of all defined masts.
+* `addmast <nh> <addr>` - add mast with address `<addr>` and `<nh>` heads
+* `delmast` - delete last mast.
+* `clearmasts` - remove all masts.
+* `br <ch> <max>` - set maximum brightness of channel `<ch>`(0-based) to `<max>`(1..255).
+* `inaddr <addr>` - set address of first input channel to `<addr>`.
+* `reset` - load default configuration.
+* `save` - save current config to EEPROM. 
+  Don't forget to issue this command after changing configuration!
+* `off` - turn off all masts.
+* `ch <ch> <val>` - set output channel `<ch>`(0-based) value to `<val>`(0/1)
+* `mast <N>` - select mast `<N>`(0-based index) for the following command.
+* `0`..`9`,`A`..`F` - set aspect of selected mast to this hex value.
+
+
 ////
 When UART cannot be used, simple configuration can be done with a throttle.
 Physical access to the decoder is still required to press the button on the decoder.
 To use this simple mode, the firmware be switched to configuration mode by holding the button for 3s.
 After that, the decoder will wait for a turnout command. The address of the turnout
 ////
-The firmware had an way to configure some parameters via throttle commands without the need for a PC and UART.
-This is removed now, but may be implemented again in future.
+The firmware had a way to configure some parameters via throttle commands without the need for a PC and UART.
+This functionality is removed now, but may be implemented again in future.
 
 LocoNet commands (SV or CV) may be implemented in future.
