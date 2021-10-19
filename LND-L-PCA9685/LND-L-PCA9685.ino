@@ -2,7 +2,15 @@
 
 #include "SerialUtils.h"
 #include "MastManager.h"
+
+#if defined(TLC5947)
 #include "TLC5947GPIO.h"
+#elif defined(PCA9685)
+#include "PCA9685GPIO.h"
+#else
+#pragma error "No LED driver defined"
+#endif
+
 #include "SerialReader.h"
 #include "LedBlinker.h"
 
@@ -19,7 +27,7 @@ constexpr int PIN_VEN = 3;
 constexpr int PIN_LED = 10;
 constexpr int PIN_BTN = 2;
 
-constexpr bool INPUT_PULLUP_EN = true;
+constexpr bool INPUT_PULLUP_EN = false;
 constexpr int PIN_IN[ADDR_IN_COUNT] = {11, 12, A0, A1, A2, A3, 7, 6};
 
 //=== PCB V2
@@ -30,7 +38,7 @@ constexpr int PIN_VEN = 4;
 constexpr int PIN_LED = 6;
 constexpr int PIN_BTN = 2;
 
-constexpr bool INPUT_PULLUP_EN = true;
+constexpr bool INPUT_PULLUP_EN = false;
 constexpr int PIN_IN[ADDR_IN_COUNT] = {11, 12, A0, A1, A2, A3, 7, 3};
 */
 
@@ -42,7 +50,11 @@ constexpr int TIMER_INTL = 25;
 
 using LED = LedBlinker<PIN_LED, TIMER_INTL>;
 
+#if defined(TLC5947)
 using PwmDriver = TLC5947GPIO<PIN_TLC_CLK, PIN_TLC_DAT, PIN_TLC_LATCH>;
+#else 
+using PwmDriver = PCA9685GPIO<PIN_OE>;
+#endif
 using TMastManager = MastManager<PwmDriver::CH_OUT_COUNT/2, PwmDriver>;
 TMastManager masts;
 
@@ -162,7 +174,7 @@ void setConfigMode(uint8_t stage, uint16_t var=0) {
 
 void checkButton() {
     static uint8_t lastBt;
-    static long btPressTime = 0;
+    static uint32_t btPressTime = 0;
     uint8_t bt = 1-digitalRead(PIN_BTN); // it's inverted
     if(bt==1 && lastBt==0) {
         //Serial.println("Button down");
