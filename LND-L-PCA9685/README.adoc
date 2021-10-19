@@ -77,11 +77,13 @@ uncommenting corresponding ifdefs in `.ino` file.
 Each mast has its own 11-bit address. 
 The preferred way to control the masts is to issue a LocoNet OPC_IMM_PACKET packet with raw DCC data that contains an extended accessory DCC packet. 
 Such packets contain an address of the mast and an aspect to be set, so this maps naturally to the mast+aspect architecture of the decoder.
+However, I don't know how well it is supported by different throttles. 
+JMRI supports these packets for sure.
 
 For compatibility, ordinary turnout commands (OPC_SW_REQ) are also supported. 
-When there is an mast with address M, sending a turnout ON command 
-(both Thrown or Closed) at address M+A will set aspect A at mast M.
-Therefore, in this mode, each mast has a range of addresses associated with it, and it is required that ranges for different masts do not overlap. 
+Presumably, any throttle can send these packets.
+Sending a turnout ON command (both Thrown or Closed) at address M+A will set aspect A at mast with address M.
+Therefore, in this mode, each mast has a range of addresses associated with it (2 to 8, depending on the number of heads in the mast), and it is required that ranges for different masts do not overlap. 
 The firmware, however, makes no checks for this and will operate several masts if 
 the turnout address falls into ranges of several masts.
 
